@@ -1,0 +1,12 @@
+services:
+    show-saver:
+        image: show-saver
+        container_name: show-saver
+        build: .
+        env_file:
+            - ./.local/dev.env
+        environment:
+            - URL=testy
+        volumes:
+            - ./.local/config:/config
+            - ./.local/tvshows:/tvshows
