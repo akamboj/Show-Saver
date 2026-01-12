@@ -13,8 +13,8 @@ SHOW_NAME_OVERRIDES = {
 
 BASE_YT_OPTS = {
     'usenetrc' : True,
-    #'netrc_location' : os.getcwd(), may still want to use this since this command prints in the log, exposing passwords
-    'netrc_cmd' : "echo machine dropout login {} password {}".format(USERNAME, PASSWORD),
+    'netrc_location' : str(CONFIG_DIR), #may still want to use this since this command prints in the log, exposing passwords
+    #'netrc_cmd' : "echo machine dropout login {} password {}".format(USERNAME, PASSWORD),
     'paths' : {
         'home' : str(TMP_DIR)
     }
