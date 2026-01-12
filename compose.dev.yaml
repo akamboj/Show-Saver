@@ -4,9 +4,10 @@ services:
         container_name: show-saver
         build: .
         env_file:
-            - ./.local/dev.env
+            - ./dev.env
         environment:
-            - URL=testy
+            - URL2=testy
         volumes:
             - ./.local/config:/config
             - ./.local/tvshows:/tvshows
+            - ./.local/tmp:/tmp

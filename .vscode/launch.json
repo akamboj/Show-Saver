@@ -8,8 +8,11 @@
             "name": "Python Run script",
             "type": "debugpy",
             "request": "launch",
-            "program": "main.py",
-            "console": "integratedTerminal"
+            "program": "showsaver/main.py",
+            "console": "integratedTerminal",
+            "justMyCode": false,
+            "env": {
+            }
         }
     ]
 }

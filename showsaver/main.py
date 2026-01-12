@@ -1,0 +1,111 @@
+import os
+import shutil
+import sys
+import yt_dlp
+from env import (
+    CONFIG_DIR, SHOW_DIR, TMP_DIR, URL, USERNAME,
+    PASSWORD,
+)
+
+SHOW_NAME_OVERRIDES = {
+    'Very Important People' : 'Very Important People (2023)'
+}
+
+BASE_YT_OPTS = {
+    'usenetrc' : True,
+    #'netrc_location' : os.getcwd(), may still want to use this since this command prints in the log, exposing passwords
+    'netrc_cmd' : "echo machine dropout login {} password {}".format(USERNAME, PASSWORD),
+    'paths' : {
+        'home' : str(TMP_DIR)
+    }
+}
+
+# yt-dlp docs
+# https://github.com/yt-dlp/yt-dlp/blob/00dcde728635633eee969ad4d498b9f233c4a94e/yt_dlp/YoutubeDL.py#L212
+
+
+# the info file has the show name and season number, we need these for building the destination path on the server
+def get_metadata(show_url):
+    dlp_opts = {
+        **BASE_YT_OPTS,
+        'skip_download' : True
+    }
+    yt = yt_dlp.YoutubeDL(dlp_opts)
+    
+    print('Downloading metadata for url: ' + show_url)
+    info_dict = yt.extract_info(show_url)
+    print('\nMetadata download complete!')
+    return info_dict
+
+def download_show(show_url, info_dict):
+    dlp_opts = {
+        **BASE_YT_OPTS,
+        'outtmpl' : { 'default' : '%(series)s - S%(season_number)02dE%(episode_number)02d - %(title)s WEBDL-1080p.%(ext)s' },
+        'postprocessors': [{
+            'key': 'FFmpegEmbedSubtitle',
+            'already_have_subtitle': False
+        }],
+        'writesubtitles' : True
+    }
+    yt = yt_dlp.YoutubeDL(dlp_opts)
+    
+    yt.download(show_url)
+    show_file_name = yt.evaluate_outtmpl(dlp_opts['outtmpl']['default'], info_dict)
+    show_path = os.path.abspath(os.path.join(dlp_opts['paths']['home'], show_file_name))
+    return show_path
+
+def copy_to_destination(info_dict, show_path, base_destination_path):
+    
+    show_name = info_dict['series']
+    season_number = info_dict['season_number']
+    season_folder = 'Season ' + str(season_number)
+    episode_filename = os.path.basename(show_path)
+
+    if show_name in SHOW_NAME_OVERRIDES:
+        episode_filename = episode_filename.replace(show_name, SHOW_NAME_OVERRIDES[show_name])
+        show_name = SHOW_NAME_OVERRIDES[show_name]
+
+    full_destination_path = os.path.join(base_destination_path, show_name, season_folder)
+    full_episode_path = os.path.join(full_destination_path, episode_filename)
+
+    print("Starting copy to: " + full_destination_path)
+    os.makedirs(full_destination_path, exist_ok=True)
+
+    shutil.copy2(show_path, full_episode_path)
+    print("Copy complete!")
+
+
+def process_url(show_url, desired_destination):
+    info_dict = get_metadata(show_url)
+    
+    show_path = download_show(show_url, info_dict)
+    
+    copy_to_destination(info_dict, show_path, str(desired_destination))
+    
+
+def validate_vars():
+    if not USERNAME:
+        sys.exit("Missing username var.")
+    if not PASSWORD:
+        sys.exit("Missing password var.")
+    if not URL:
+        sys.exit("Missing URL var.")
+
+    print("********** Begin env vars **********")
+    print("Username: " + USERNAME)
+    print("Password: ******")
+    print("URL: " + URL)
+    print("********** End env vars **********")
+    print("\n")
+
+def main():
+    # Validate and print env vars
+    validate_vars()
+    
+    print("yt-dlp version: " + yt_dlp.version.__version__)
+
+    process_url(URL, SHOW_DIR)
+
+
+
+main()

@@ -15,7 +15,8 @@
         {
             "label": "docker-compose up (dev)",
             "type": "shell",
-            "command": "docker compose -f ./compose.dev.yaml up --build"
+            "command": "docker compose -f ./compose.dev.yaml up --build",
+            "problemMatcher": []
         }
     ]
 }
