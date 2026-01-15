@@ -30,4 +30,4 @@ jobs:
       uses: docker/build-push-action@v5
       with:
         push: true
-        tags: akamboj/show-saver:latest
+        tags: akamboj2000/show-saver:latest
