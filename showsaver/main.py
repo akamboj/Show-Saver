@@ -82,11 +82,14 @@ def copy_to_destination(info_dict, show_path, base_destination_path):
 
 def process_urls(url_list, desired_destination):
     print('********** Processing Urls: **********')
-    for url in url_list:
-        print(url)
-    
-    for url in url_list:
-        process_url(url, desired_destination)
+    if len(url) > 0:
+        for url in url_list:
+            print(url)
+        
+        for url in url_list:
+            process_url(url, desired_destination)
+    else:
+        print("No initial Urls provided.")
 
 
 def process_url(show_url, desired_destination):
