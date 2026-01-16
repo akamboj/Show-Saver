@@ -11,15 +11,19 @@ SHOW_NAME_OVERRIDES = {
     'Very Important People' : 'Very Important People (2023)'
 }
 
+URL_LIST_FILE_PATH = os.path.join(CONFIG_DIR, 'urls.txt')
+
+def progress_hook(d):
+    print(d['_default_template'])
+
 BASE_YT_OPTS = {
     'usenetrc' : True,
-    'netrc_location' : str(CONFIG_DIR), #may still want to use this since this command prints in the log, exposing passwords
-    #https://www.reddit.com/r/docker/comments/11c9yu7/is_tmp_within_a_container_as_volatile_as_the_os/ja2y11x/
-    #https://docs.docker.com/engine/storage/tmpfs/#use-a-tmpfs-mount-in-a-container
+    'netrc_location' : str(CONFIG_DIR),
     #'netrc_cmd' : "echo machine dropout login {} password {}".format(USERNAME, PASSWORD),
     'paths' : {
         'home' : str(TMP_DIR)
-    }
+    },
+    'progress_hooks' : [progress_hook]
 }
 
 # yt-dlp docs
@@ -77,6 +81,15 @@ def copy_to_destination(info_dict, show_path, base_destination_path):
     print("Copy complete!")
 
 
+def process_urls(url_list, desired_destination):
+    print('********** Processing Urls: **********')
+    for url in url_list:
+        print(url)
+    
+    for url in url_list:
+        process_url(url, desired_destination)
+
+
 def process_url(show_url, desired_destination):
     info_dict = get_metadata(show_url)
     
@@ -84,29 +97,37 @@ def process_url(show_url, desired_destination):
     
     copy_to_destination(info_dict, show_path, str(desired_destination))
     
+    
+def get_urls_to_process():
+    urls = []
+    if URL:
+        urls.append(URL)
 
-def validate_vars():
-    #if not USERNAME:
-    #    sys.exit("Missing username var.")
-    #if not PASSWORD:
-    #    sys.exit("Missing password var.")
-    if not URL:
-        sys.exit("Missing URL var.")
+    with open(URL_LIST_FILE_PATH, 'r') as url_list_file:
+        file_urls = [line.strip() for line in url_list_file if line.strip()]
+        urls.extend(file_urls)
+    
+    return urls
 
-    print("********** Begin env vars **********")
-    print("Username: " + USERNAME)
-    print("Password: ******")
-    print("URL: " + URL)
-    print("********** End env vars **********")
-    print("\n")
+
+def create_config_files():
+    netrc_path = os.path.join(CONFIG_DIR, '.netrc')
+    if not os.path.exists(netrc_path):
+        with open(netrc_path, 'w') as netrc_file:
+            print('Created .netrc file: ' + netrc_path)
+
+    if not os.path.exists(URL_LIST_FILE_PATH):
+        with open(URL_LIST_FILE_PATH, 'w') as url_list_file:
+            print('Created url text file: ' + URL_LIST_FILE_PATH)
+
 
 def main():
-    # Validate and print env vars
-    validate_vars()
+    create_config_files()
     
     print("yt-dlp version: " + yt_dlp.version.__version__)
 
-    process_url(URL, SHOW_DIR)
+    urls_to_process = get_urls_to_process()
+    process_urls(urls_to_process, SHOW_DIR)
 
 
 
