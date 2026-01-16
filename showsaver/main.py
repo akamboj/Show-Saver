@@ -3,8 +3,7 @@ import shutil
 import sys
 import yt_dlp
 from env import (
-    CONFIG_DIR, SHOW_DIR, TMP_DIR, URL, USERNAME,
-    PASSWORD,
+    CONFIG_DIR, SHOW_DIR, TMP_DIR, URL
 )
 
 SHOW_NAME_OVERRIDES = {
@@ -97,7 +96,7 @@ def process_url(show_url, desired_destination):
     
     copy_to_destination(info_dict, show_path, str(desired_destination))
     
-    
+
 def get_urls_to_process():
     urls = []
     if URL:
@@ -130,5 +129,5 @@ def main():
     process_urls(urls_to_process, SHOW_DIR)
 
 
-
-main()
+if __name__=="__main__":
+    main()

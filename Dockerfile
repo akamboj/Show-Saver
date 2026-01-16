@@ -1,7 +1,6 @@
 FROM python:3.14-slim
 
 ENV PYTHONUNBUFFERED=1
-#ENV USERNAME=
 
 WORKDIR /app
 
