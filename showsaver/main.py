@@ -14,6 +14,8 @@ SHOW_NAME_OVERRIDES = {
 BASE_YT_OPTS = {
     'usenetrc' : True,
     'netrc_location' : str(CONFIG_DIR), #may still want to use this since this command prints in the log, exposing passwords
+    #https://www.reddit.com/r/docker/comments/11c9yu7/is_tmp_within_a_container_as_volatile_as_the_os/ja2y11x/
+    #https://docs.docker.com/engine/storage/tmpfs/#use-a-tmpfs-mount-in-a-container
     #'netrc_cmd' : "echo machine dropout login {} password {}".format(USERNAME, PASSWORD),
     'paths' : {
         'home' : str(TMP_DIR)
@@ -84,10 +86,10 @@ def process_url(show_url, desired_destination):
     
 
 def validate_vars():
-    if not USERNAME:
-        sys.exit("Missing username var.")
-    if not PASSWORD:
-        sys.exit("Missing password var.")
+    #if not USERNAME:
+    #    sys.exit("Missing username var.")
+    #if not PASSWORD:
+    #    sys.exit("Missing password var.")
     if not URL:
         sys.exit("Missing URL var.")
 

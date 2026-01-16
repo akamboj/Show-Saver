@@ -10,7 +10,7 @@ RUN apt-get update && \
     apt-get clean
 
 COPY ./requirements.txt /app/
-RUN pip install --requirement /app/requirements.txt
+RUN pip install --requirement /app/requirements.txt --root-user-action=ignore
 COPY ./showsaver /app
 
 VOLUME /config /tvshows /tmp

@@ -6,7 +6,7 @@ services:
         env_file:
             - ./dev.env
         environment:
-            - URL2=testy
+            - SHOW_URL2=testy
         volumes:
             - ./.local/config:/config
             - ./.local/tvshows:/tvshows

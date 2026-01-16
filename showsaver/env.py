@@ -14,6 +14,6 @@ TMP_DIR = Path(os.getenv("TMP_DIR", "/tmp"))
 # User info vars
 #
 
-URL = os.getenv("URL", "")
-USERNAME = os.getenv("USERNAME", "")
-PASSWORD = os.getenv("PASSWORD", "")
+URL = os.getenv("SHOW_URL", "")
+USERNAME = os.getenv("SITE_USERNAME", "")
+PASSWORD = os.getenv("SITE_PASSWORD", "")
