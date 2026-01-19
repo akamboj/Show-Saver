@@ -13,6 +13,7 @@ SHOW_NAME_OVERRIDES = {
 def progress_hook(d):
     print(d['_default_template'])
 
+
 BASE_YT_OPTS = {
     #'verbose' : True,
     'usenetrc' : True,
@@ -35,7 +36,7 @@ def get_metadata(show_url):
         'skip_download' : True
     }
     yt = yt_dlp.YoutubeDL(dlp_opts)
-    
+
     print('Downloading metadata for url: ' + show_url)
     info_dict = yt.extract_info(show_url)
     print('\nMetadata download complete!')
@@ -53,7 +54,7 @@ def download_show(show_url, info_dict, progress_callback=None):
 
     dlp_opts = {
         **BASE_YT_OPTS,
-        'outtmpl' : { 'default' : '%(series)s - S%(season_number)02dE%(episode_number)02d - %(title)s WEBDL-1080p.%(ext)s' },
+        'outtmpl' : {'default' : '%(series)s - S%(season_number)02dE%(episode_number)02d - %(title)s WEBDL-1080p.%(ext)s'},
         'postprocessors': [{
             'key': 'FFmpegEmbedSubtitle',
             'already_have_subtitle': False
@@ -68,8 +69,8 @@ def download_show(show_url, info_dict, progress_callback=None):
     show_path = os.path.abspath(os.path.join(dlp_opts['paths']['home'], show_file_name))
     return show_path
 
+
 def copy_to_destination(info_dict, show_path, base_destination_path):
-    
     show_name = info_dict['series']
     season_number = info_dict['season_number']
     season_folder = 'Season ' + str(season_number)
@@ -94,7 +95,7 @@ def process_urls(url_list, desired_destination):
     if len(url_list) > 0:
         for url in url_list:
             print(url)
-        
+
         for url in url_list:
             process_url(url, desired_destination)
     else:

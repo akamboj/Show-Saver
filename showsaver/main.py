@@ -9,7 +9,7 @@ from datetime import datetime
 from env import (
     CONFIG_DIR, SHOW_DIR, URL
 )
-from flask import Flask,jsonify,request,render_template
+from flask import Flask, jsonify, request, render_template
 
 URL_LIST_FILE_PATH = os.path.join(CONFIG_DIR, 'urls.txt')
 
@@ -31,7 +31,7 @@ def home():
 def submit():
     data = request.get_json()
     url = data.get('text', '').strip()
-    
+
     # Validate URL
     if not url:
         return jsonify({
@@ -40,19 +40,19 @@ def submit():
         }), 400
 
     job_id = queue_url(url)
-    
+
     # Get queue position
     queue_position = download_queue.qsize()
-    
+
     response = {
         'success': True,
-        'message': f'URL queued for download',
+        'message': 'URL queued for download',
         'job_id': job_id,
         'url': url,
         'queue_position': queue_position,
         'status': 'queued'
     }
-    
+
     return jsonify(response)
 
 
@@ -77,7 +77,7 @@ def get_queue():
         queued = [v for v in download_status.values() if v['status'] == 'queued']
         downloading = [v for v in download_status.values() if v['status'] == 'downloading']
         completed = download_history[-10:] if download_history else []
-        
+
         return jsonify({
             'success': True,
             'queued': queued,
@@ -95,15 +95,15 @@ def download_worker():
             item = download_queue.get(timeout=1)
             if item is None:
                 break
-            
+
             url = item['url']
             job_id = item['id']
-            
+
             # Update status to downloading
             with thread_lock:
                 download_status[job_id]['status'] = 'downloading'
                 download_status[job_id]['started_at'] = datetime.now().isoformat()
-            
+
             try:
                 def update_progress(percent):
                     with thread_lock:
@@ -113,7 +113,7 @@ def download_worker():
 
                 file_path = ''
                 file_size = 0
-                
+
                 # Mark as completed
                 with thread_lock:
                     download_status[job_id]['status'] = 'completed'
@@ -121,16 +121,16 @@ def download_worker():
                     download_status[job_id]['file_path'] = file_path
                     download_status[job_id]['size'] = file_size
                     download_history.append(download_status[job_id].copy())
-                
+
             except Exception as e:
                 # Mark as failed
                 with thread_lock:
                     download_status[job_id]['status'] = 'failed'
                     download_status[job_id]['error'] = str(e)
                     download_status[job_id]['completed_at'] = datetime.now().isoformat()
-            
+
             download_queue.task_done()
-            
+
         except queue.Empty:
             continue
 
@@ -158,7 +158,7 @@ def queue_url(url):
 
     with thread_lock:
         download_status[job_id] = job_status.copy()
-    
+
     download_queue.put({'id': job_id, 'url': url})
     return job_id
 
@@ -171,7 +171,7 @@ def get_urls_to_process():
     with open(URL_LIST_FILE_PATH, 'r') as url_list_file:
         file_urls = [line.strip() for line in url_list_file if line.strip()]
         urls.extend(file_urls)
-    
+
     return urls
 
 
@@ -188,7 +188,7 @@ def create_config_files():
 
 def main():
     create_config_files()
-    
+
     print("yt-dlp version: " + yt_dlp.version.__version__)
 
     urls_to_process = get_urls_to_process()
@@ -202,5 +202,5 @@ def main():
     app.run(debug=True, host='0.0.0.0', port=port)
 
 
-if __name__=="__main__":
+if __name__ == "__main__":
     main()
