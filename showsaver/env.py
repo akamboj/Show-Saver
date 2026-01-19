@@ -12,6 +12,12 @@ CONFIG_DIR = Path(os.getenv("CONFIG_DIR", "/config"))
 SHOW_DIR = Path(os.getenv("SHOW_DIR", "/tvshows"))
 TMP_DIR = Path(os.getenv("TMP_DIR", "/tmp"))
 
+#
+# Debug
+#
+
+DEBUG = string_to_bool(os.getenv("FLASK_DEBUG", "false"))
+FLASK_PORT = int(os.getenv("FLASK_PORT", "5000"))
 
 #
 # User info vars

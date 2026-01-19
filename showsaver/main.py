@@ -7,7 +7,7 @@ import time
 import yt_dlp
 from datetime import datetime
 from env import (
-    CONFIG_DIR, SHOW_DIR, URL
+    CONFIG_DIR, SHOW_DIR, DEBUG, FLASK_PORT, URL
 )
 from flask import Flask, jsonify, request, render_template
 
@@ -198,8 +198,7 @@ def main():
     download_thread = threading.Thread(target=download_worker, daemon=True)
     download_thread.start()
 
-    port = int(os.environ.get('PORT', 5000))
-    app.run(debug=True, host='0.0.0.0', port=port)
+    app.run(debug=DEBUG, host='0.0.0.0', port=FLASK_PORT)
 
 
 if __name__ == "__main__":
