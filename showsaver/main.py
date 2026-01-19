@@ -39,21 +39,7 @@ def submit():
             'message': 'URL cannot be empty'
         }), 400
 
-    # Generate job ID
-    job_id = generate_job_ID()
-    # Add to queue
-    job_status = {
-        'id': job_id,
-        'url': url,
-        'status': 'queued',
-        'queued_at': datetime.now().isoformat(),
-        'progress': 0
-    }
-
-    with thread_lock:
-        download_status[job_id] = job_status.copy()
-    
-    download_queue.put({'id': job_id, 'url': url})
+    job_id = queue_url(url)
     
     # Get queue position
     queue_position = download_queue.qsize()
@@ -145,8 +131,33 @@ def download_worker():
             continue
 
 
-def generate_job_ID():
+def generate_job_id():
     return f"{int(time.time())}_{len(download_status)}"
+
+
+def create_job_status(job_id, url):
+    job_status = {
+        'id': job_id,
+        'url': url,
+        'status': 'queued',
+        'queued_at': datetime.now().isoformat(),
+        'progress': 0
+    }
+    return job_status
+
+
+def queue_url(url):
+    # Generate job ID
+    job_id = generate_job_id()
+    # Add to queue
+    job_status = create_job_status(job_id, url)
+
+    with thread_lock:
+        download_status[job_id] = job_status.copy()
+    
+    download_queue.put({'id': job_id, 'url': url})
+    return job_id
+
 
 def get_urls_to_process():
     urls = []
@@ -177,7 +188,8 @@ def main():
     print("yt-dlp version: " + yt_dlp.version.__version__)
 
     urls_to_process = get_urls_to_process()
-    #downloader.process_urls(urls_to_process, SHOW_DIR)
+    for url in urls_to_process:
+        queue_url(url)
 
     download_thread = threading.Thread(target=download_worker, daemon=True)
     download_thread.start()
