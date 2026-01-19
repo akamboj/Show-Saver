@@ -41,7 +41,16 @@ def get_metadata(show_url):
     print('\nMetadata download complete!')
     return info_dict
 
-def download_show(show_url, info_dict):
+
+def download_show(show_url, info_dict, progress_callback=None):
+    def progress_hook_callback(d):
+        print(d['_default_template'])
+        if progress_callback and d['status'] == 'downloading':
+            total = d.get('total_bytes') or d.get('total_bytes_estimate')
+            if total:
+                percent = (d.get('downloaded_bytes', 0) / total) * 100
+                progress_callback(percent)
+
     dlp_opts = {
         **BASE_YT_OPTS,
         'outtmpl' : { 'default' : '%(series)s - S%(season_number)02dE%(episode_number)02d - %(title)s WEBDL-1080p.%(ext)s' },
@@ -49,10 +58,11 @@ def download_show(show_url, info_dict):
             'key': 'FFmpegEmbedSubtitle',
             'already_have_subtitle': False
         }],
-        'writesubtitles' : True
+        'writesubtitles' : True,
+        'progress_hooks' : [progress_hook_callback]
     }
     yt = yt_dlp.YoutubeDL(dlp_opts)
-    
+
     yt.download(show_url)
     show_file_name = yt.evaluate_outtmpl(dlp_opts['outtmpl']['default'], info_dict)
     show_path = os.path.abspath(os.path.join(dlp_opts['paths']['home'], show_file_name))
@@ -91,11 +101,11 @@ def process_urls(url_list, desired_destination):
         print("No initial Urls provided.")
 
 
-def process_url(show_url, desired_destination):
+def process_url(show_url, desired_destination, progress_callback=None):
     info_dict = get_metadata(show_url)
-    
-    show_path = download_show(show_url, info_dict)
-    
+
+    show_path = download_show(show_url, info_dict, progress_callback)
+
     copy_to_destination(info_dict, show_path, str(desired_destination))
 
     if DO_CLEANUP:

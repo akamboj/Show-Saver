@@ -105,7 +105,11 @@ def download_worker():
                 download_status[job_id]['started_at'] = datetime.now().isoformat()
             
             try:
-                downloader.process_url(url, SHOW_DIR)
+                def update_progress(percent):
+                    with thread_lock:
+                        download_status[job_id]['progress'] = int(percent)
+
+                downloader.process_url(url, SHOW_DIR, progress_callback=update_progress)
 
                 file_path = ''
                 file_size = 0
