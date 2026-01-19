@@ -2,6 +2,8 @@ FROM python:3.14-slim
 
 ENV PYTHONUNBUFFERED=1
 
+EXPOSE 5000
+
 WORKDIR /app
 
 RUN apt-get update && \
