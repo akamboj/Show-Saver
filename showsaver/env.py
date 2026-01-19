@@ -1,6 +1,9 @@
 import os
 from pathlib import Path
 
+def string_to_bool(s):
+    return s.lower() in ["true", "yes", "1", "y"]
+
 #
 # Directories
 #
@@ -15,3 +18,9 @@ TMP_DIR = Path(os.getenv("TMP_DIR", "/tmp"))
 #
 
 URL = os.getenv("SHOW_URL", "")
+
+#
+# Configuration
+#
+
+DO_CLEANUP = os.getenv("AUTO_CLEANUP_TMP", "true")

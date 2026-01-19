@@ -2,7 +2,7 @@ import os
 import shutil
 import yt_dlp
 from env import (
-    CONFIG_DIR, TMP_DIR
+    CONFIG_DIR, TMP_DIR, DO_CLEANUP
 )
 
 SHOW_NAME_OVERRIDES = {
@@ -14,6 +14,7 @@ def progress_hook(d):
     print(d['_default_template'])
 
 BASE_YT_OPTS = {
+    #'verbose' : True,
     'usenetrc' : True,
     'netrc_location' : str(CONFIG_DIR),
     #'netrc_cmd' : "echo machine dropout login {} password {}".format(USERNAME, PASSWORD),
@@ -96,3 +97,7 @@ def process_url(show_url, desired_destination):
     show_path = download_show(show_url, info_dict)
     
     copy_to_destination(info_dict, show_path, str(desired_destination))
+
+    if DO_CLEANUP:
+        if os.path.exists(show_path):
+            os.remove(show_path)
