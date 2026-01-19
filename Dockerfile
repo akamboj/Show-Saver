@@ -1,10 +1,13 @@
 FROM python:3.14-slim
 
+# Keeps Python from generating .pyc files in the container
+ENV PYTHONDONTWRITEBYTECODE=1
+
+# Turns off buffering for easier container logging
 ENV PYTHONUNBUFFERED=1
 
 ENV AUTO_CLEANUP_TMP=1
 
-EXPOSE 5000
 
 WORKDIR /app
 
@@ -18,4 +21,7 @@ COPY ./showsaver /app
 
 VOLUME /config /tvshows /tmp
 
-CMD ["python", "main.py"]
+EXPOSE 5000
+
+# During debugging, this entry point will be overridden. For more information, please refer to https://aka.ms/vscode-docker-python-debug
+CMD ["gunicorn", "--bind", "0.0.0.0:5000", "--worker-tmp-dir", "/dev/shm", "main:app"]

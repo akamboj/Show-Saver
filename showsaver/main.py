@@ -89,7 +89,7 @@ def get_queue():
 
 def download_worker():
     # Background worker that processes download queue
-    print('thread started')
+    print('Download thread started.')
     while True:
         try:
             item = download_queue.get(timeout=1)
@@ -186,18 +186,30 @@ def create_config_files():
             print('Created url text file: ' + URL_LIST_FILE_PATH)
 
 
+def _initialize():
+    """Initialize app - runs on module load for gunicorn compatibility."""
+    try:
+        create_config_files()
+
+        print("yt-dlp version: " + yt_dlp.version.__version__)
+
+        urls_to_process = get_urls_to_process()
+        for url in urls_to_process:
+            queue_url(url)
+
+        download_thread = threading.Thread(target=download_worker, daemon=True)
+        download_thread.start()
+    except Exception as e:
+        print(f"Initialization error: {e}")
+        import traceback
+        traceback.print_exc()
+        raise
+
+
+_initialize()
+
+
 def main():
-    create_config_files()
-
-    print("yt-dlp version: " + yt_dlp.version.__version__)
-
-    urls_to_process = get_urls_to_process()
-    for url in urls_to_process:
-        queue_url(url)
-
-    download_thread = threading.Thread(target=download_worker, daemon=True)
-    download_thread.start()
-
     app.run(debug=DEBUG, host='0.0.0.0', port=FLASK_PORT)
 
 

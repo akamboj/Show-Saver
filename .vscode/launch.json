@@ -12,10 +12,10 @@
             "console": "integratedTerminal",
             "justMyCode": false,
             "env": {
-                "CONFIG_DIR" : "./.local/config",
-                "SHOW_DIR" : "./.local/tmp",
-                "TMP_DIR" : "./.local/tvshows",
-                "FLASK_DEBUG" : "true",
+                "CONFIG_DIR": "./.local/config",
+                "SHOW_DIR": "./.local/tmp",
+                "TMP_DIR": "./.local/tvshows",
+                "FLASK_DEBUG": "true",
             }
         }
     ]
