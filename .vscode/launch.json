@@ -15,8 +15,24 @@
                 "CONFIG_DIR": "./.local/config",
                 "SHOW_DIR": "./.local/tmp",
                 "TMP_DIR": "./.local/tvshows",
-                "FLASK_DEBUG": "true",
+                "FLASK_DEBUG": "true"
             }
+        },
+        {
+            "name": "Docker: Attach",
+            "type": "debugpy",
+            "request": "attach",
+            "connect": {
+                "host": "localhost",
+                "port": 5678
+            },
+            "pathMappings": [
+                {
+                    "localRoot": "${workspaceFolder}/showsaver",
+                    "remoteRoot": "/app"
+                }
+            ],
+            "justMyCode": false
         }
     ]
 }

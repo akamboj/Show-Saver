@@ -11,6 +11,14 @@ from env import (
 )
 from flask import Flask, jsonify, request, render_template
 
+# Enable remote debugging when debugging is enabled
+if DEBUG:
+    import debugpy
+    debugpy.listen(('0.0.0.0', 5678))
+    print('Debugpy listening on port 5678. Waiting for debugger to attach...')
+    debugpy.wait_for_client()
+    print('Debugger attached!')
+
 URL_LIST_FILE_PATH = os.path.join(CONFIG_DIR, 'urls.txt')
 
 app = Flask(__name__)
