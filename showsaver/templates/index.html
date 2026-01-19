@@ -10,11 +10,11 @@
     <style>
         :root {
             --primary: #FF2D55;
-            --secondary: #1a1a1a;
-            --background: #f8f7f4;
-            --text: #2a2a2a;
+            --secondary: #f0f0f0;
+            --background: #121212;
+            --text: #e0e0e0;
             --accent: #00D4AA;
-            --shadow: rgba(0, 0, 0, 0.1);
+            --shadow: rgba(0, 0, 0, 0.4);
         }
 
         * {
@@ -129,7 +129,7 @@
         .subtitle {
             font-size: clamp(1rem, 2.5vw, 1.25rem);
             font-weight: 300;
-            color: #666;
+            color: #999;
             margin-top: 1.5rem;
             animation: fadeIn 0.8s ease-out 0.4s both;
         }
@@ -144,11 +144,11 @@
         }
 
         .form-container {
-            background: white;
+            background: #1e1e1e;
             border-radius: 16px;
             padding: 2.5rem;
             box-shadow: 0 20px 60px var(--shadow);
-            border: 1px solid rgba(0, 0, 0, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.05);
             animation: slideUp 0.8s ease-out 0.2s both;
             position: relative;
             overflow: hidden;
@@ -193,20 +193,21 @@
             width: 100%;
             min-height: 180px;
             padding: 1.25rem;
-            border: 2px solid #e5e5e5;
+            border: 2px solid #3a3a3a;
             border-radius: 12px;
             font-family: 'Karla', sans-serif;
             font-size: 1rem;
             line-height: 1.6;
             resize: vertical;
             transition: all 0.3s ease;
-            background: #fafafa;
+            background: #2a2a2a;
+            color: var(--text);
         }
 
         textarea:focus {
             outline: none;
             border-color: var(--primary);
-            background: white;
+            background: #2a2a2a;
             box-shadow: 0 0 0 4px rgba(255, 45, 85, 0.1);
         }
 
@@ -232,7 +233,7 @@
 
         .submit-btn {
             background: var(--secondary);
-            color: white;
+            color: rgb(0, 0, 0);
             text-transform: uppercase;
             letter-spacing: 0.05em;
         }
@@ -278,12 +279,12 @@
         .clear-btn {
             background: transparent;
             color: var(--text);
-            border: 2px solid #e5e5e5;
+            border: 2px solid #3a3a3a;
         }
 
         .clear-btn:hover {
             border-color: var(--secondary);
-            background: #fafafa;
+            background: #2a2a2a;
         }
 
         .response {
@@ -317,7 +318,7 @@
         .response-text {
             font-size: 0.95rem;
             line-height: 1.6;
-            color: #555;
+            color: #aaa;
         }
 
         .stats {
@@ -325,7 +326,7 @@
             gap: 1.5rem;
             margin-top: 1rem;
             padding-top: 1rem;
-            border-top: 1px solid rgba(0, 0, 0, 0.1);
+            border-top: 1px solid rgba(255, 255, 255, 0.1);
         }
 
         .stat {
@@ -343,7 +344,7 @@
             font-size: 0.75rem;
             text-transform: uppercase;
             letter-spacing: 0.1em;
-            color: #888;
+            color: #777;
         }
 
         /* Mobile responsiveness */
@@ -444,7 +445,7 @@
         }
 
         .queue-item {
-            background: white;
+            background: #1e1e1e;
             border-radius: 12px;
             padding: 1.25rem;
             border-left: 4px solid var(--accent);
@@ -512,7 +513,7 @@
         .queue-item-progress {
             margin-top: 0.75rem;
             height: 4px;
-            background: #e5e5e5;
+            background: #3a3a3a;
             border-radius: 2px;
             overflow: hidden;
         }
