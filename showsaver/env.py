@@ -23,4 +23,4 @@ URL = os.getenv("SHOW_URL", "")
 # Configuration
 #
 
-DO_CLEANUP = os.getenv("AUTO_CLEANUP_TMP", "true")
+DO_CLEANUP = string_to_bool(os.getenv("AUTO_CLEANUP_TMP", "true"))
