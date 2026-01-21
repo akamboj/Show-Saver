@@ -23,5 +23,12 @@ VOLUME /config /tvshows /tmp
 
 EXPOSE 5000
 
-# During debugging, this entry point will be overridden. For more information, please refer to https://aka.ms/vscode-docker-python-debug
 CMD ["gunicorn", "--bind", "0.0.0.0:5000", "--worker-tmp-dir", "/dev/shm", "main:app"]
+
+# ===== Development stage =====
+FROM base AS dev
+
+COPY ./requirements-dev.txt /app/
+RUN pip install --requirement /app/requirements-dev.txt --root-user-action=ignore
+
+EXPOSE 5678

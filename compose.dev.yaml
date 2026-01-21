@@ -2,7 +2,9 @@ services:
     show-saver:
         image: show-saver
         container_name: show-saver
-        build: .
+        build:
+            context: .
+            target: dev
         ports:
             - 5000:5000
             - 5678:5678
