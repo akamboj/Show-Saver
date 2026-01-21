@@ -13,8 +13,8 @@
             "justMyCode": false,
             "env": {
                 "CONFIG_DIR": "./.local/config",
-                "SHOW_DIR": "./.local/tmp",
-                "TMP_DIR": "./.local/tvshows",
+                "SHOW_DIR": "./.local/tvshows",
+                "TMP_DIR": "./.local/tmp",
                 "FLASK_DEBUG": "true"
             }
         },

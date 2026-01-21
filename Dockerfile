@@ -19,11 +19,11 @@ COPY ./requirements.txt /app/
 RUN pip install --requirement /app/requirements.txt --root-user-action=ignore
 COPY ./showsaver /app
 
-VOLUME /config /tvshows /tmp
+VOLUME /config /tvshows /temp_dir
 
 EXPOSE 5000
 
-CMD ["gunicorn", "--bind", "0.0.0.0:5000", "--worker-tmp-dir", "/dev/shm", "main:app"]
+CMD ["gunicorn", "--bind", "0.0.0.0:5000", "main:app"]
 
 # ===== Development stage =====
 FROM base AS dev

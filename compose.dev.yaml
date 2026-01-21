@@ -15,4 +15,4 @@ services:
         volumes:
             - ./.local/config:/config
             - ./.local/tvshows:/tvshows
-            - ./.local/tmp:/tmp
+            - ./.local/tmp:/temp_dir
