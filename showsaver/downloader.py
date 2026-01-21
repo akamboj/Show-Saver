@@ -44,12 +44,12 @@ def get_metadata(show_url):
 
 
 def download_show(show_url, info_dict, progress_callback=None):
-    def progress_hook_callback(d):
-        print(d['_default_template'])
-        if progress_callback and d['status'] == 'downloading':
-            total = d.get('total_bytes') or d.get('total_bytes_estimate')
+    def progress_hook_callback(download_progress):
+        print(download_progress['_default_template'])
+        if progress_callback and download_progress['status'] == 'downloading':
+            total = download_progress.get('total_bytes') or download_progress.get('total_bytes_estimate')
             if total:
-                percent = (d.get('downloaded_bytes', 0) / total) * 100
+                percent = (download_progress.get('downloaded_bytes', 0) / total) * 100
                 progress_callback(percent)
 
     dlp_opts = {
