@@ -525,6 +525,12 @@
             transition: width 0.3s ease;
         }
 
+        .queue-item-step {
+            font-size: 0.75rem;
+            color: #999;
+            margin-bottom: 0.5rem;
+        }
+
         @media (max-width: 768px) {
             .queue-item-header {
                 flex-direction: column;
@@ -607,6 +613,15 @@
         let activeJobId = null;
         let statusInterval = null;
 
+        function formatStepType(stepType) {
+            const labels = {
+                'video': 'Downloading video',
+                'audio': 'Downloading audio',
+                'video+audio': 'Downloading'
+            };
+            return labels[stepType] || 'Downloading';
+        }
+
         // Poll for queue status
         async function updateQueueStatus() {
             try {
@@ -629,6 +644,9 @@
                                     <div class="queue-item-status ${item.displayStatus}">${item.status}</div>
                                 </div>
                                 ${item.displayStatus === 'downloading' ? `
+                                    <div class="queue-item-step">
+                                        Step ${item.step || 1}/${item.total_steps || 1}: ${formatStepType(item.step_type)}
+                                    </div>
                                     <div class="queue-item-progress">
                                         <div class="queue-item-progress-bar" style="width: ${item.progress || 0}%"></div>
                                     </div>
@@ -663,8 +681,11 @@
                         statValue2.textContent = '⏳';
                         statLabel2.textContent = 'In Queue';
                     } else if (status.status === 'downloading') {
+                        const stepInfo = status.total_steps > 1
+                            ? `Step ${status.step}/${status.total_steps}`
+                            : 'Progress';
                         statValue2.textContent = `${status.progress || 0}%`;
-                        statLabel2.textContent = 'Progress';
+                        statLabel2.textContent = stepInfo;
                     } else if (status.status === 'completed') {
                         statValue2.textContent = '✓';
                         statLabel2.textContent = 'Done';

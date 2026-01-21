@@ -113,9 +113,12 @@ def download_worker():
                 download_status[job_id]['started_at'] = datetime.now().isoformat()
 
             try:
-                def update_progress(percent):
+                def update_progress(progress_info):
                     with thread_lock:
-                        download_status[job_id]['progress'] = int(percent)
+                        download_status[job_id]['progress'] = int(progress_info['percent'])
+                        download_status[job_id]['step'] = progress_info.get('step', 1)
+                        download_status[job_id]['step_type'] = progress_info.get('step_type', 'downloading')
+                        download_status[job_id]['total_steps'] = progress_info.get('total_steps', 1)
 
                 downloader.process_url(url, SHOW_DIR, progress_callback=update_progress)
 
@@ -153,7 +156,10 @@ def create_job_status(job_id, url):
         'url': url,
         'status': 'queued',
         'queued_at': datetime.now().isoformat(),
-        'progress': 0
+        'progress': 0,
+        'step': 0,
+        'step_type': '',
+        'total_steps': 0
     }
     return job_status
 

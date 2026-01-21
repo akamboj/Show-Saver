@@ -44,13 +44,45 @@ def get_metadata(show_url):
 
 
 def download_show(show_url, info_dict, progress_callback=None):
+    download_state = {'current_step': 0, 'steps': [], 'last_filename': None}
+
     def progress_hook_callback(download_progress):
         print(download_progress['_default_template'])
         if progress_callback and download_progress['status'] == 'downloading':
+            # Detect stream type from info_dict
+            info = download_progress.get('info_dict', {})
+            vcodec = info.get('vcodec', 'none')
+            acodec = info.get('acodec', 'none')
+            filename = download_progress.get('filename', '')
+
+            # Determine stream type
+            if vcodec != 'none' and acodec == 'none':
+                stream_type = 'video'
+            elif acodec != 'none' and vcodec == 'none':
+                stream_type = 'audio'
+            else:
+                stream_type = 'video+audio'  # Combined or unknown
+
+            # Detect new step (filename changes)
+            if filename != download_state['last_filename']:
+                download_state['last_filename'] = filename
+                if stream_type not in download_state['steps']:
+                    download_state['steps'].append(stream_type)
+                    download_state['current_step'] = len(download_state['steps'])
+
+            # Calculate progress
             total = download_progress.get('total_bytes') or download_progress.get('total_bytes_estimate')
+            percent = 0
             if total:
                 percent = (download_progress.get('downloaded_bytes', 0) / total) * 100
-                progress_callback(percent)
+
+            # Report progress with step info
+            progress_callback({
+                'percent': percent,
+                'step': download_state['current_step'],
+                'step_type': stream_type,
+                'total_steps': max(len(download_state['steps']), download_state['current_step'])
+            })
 
     dlp_opts = {
         **BASE_YT_OPTS,
