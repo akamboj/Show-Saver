@@ -12,6 +12,7 @@ services:
             - ./dev.env
         environment:
             - FLASK_DEBUG=true
+            - TZ=America/Los_Angeles
         volumes:
             - ./.local/config:/config
             - ./.local/tvshows:/tvshows
