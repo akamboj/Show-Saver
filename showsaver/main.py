@@ -1,6 +1,7 @@
 import downloader
 
 import os
+from version import __version__
 import queue
 import threading
 import time
@@ -32,7 +33,7 @@ thread_lock = threading.Lock()
 
 @app.route('/')
 def home():
-    return render_template('index.html')
+    return render_template('index.html', version=__version__)
 
 
 @app.route('/submit', methods=['POST'])

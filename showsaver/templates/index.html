@@ -542,6 +542,24 @@
                 max-width: 100%;
             }
         }
+
+        .version-link {
+            position: fixed;
+            bottom: 1rem;
+            right: 1rem;
+            font-family: 'Karla', sans-serif;
+            font-size: 0.75rem;
+            color: var(--text);
+            opacity: 0.5;
+            text-decoration: none;
+            transition: opacity 0.3s ease, color 0.3s ease;
+            z-index: 100;
+        }
+
+        .version-link:hover {
+            opacity: 1;
+            color: var(--primary);
+        }
     </style>
 </head>
 <body>
@@ -790,5 +808,12 @@
             }
         });
     </script>
+
+    <a href="https://github.com/akamboj/Show-Saver"
+       target="_blank"
+       rel="noopener noreferrer"
+       class="version-link">
+        v{{ version }}
+    </a>
 </body>
 </html>
