@@ -16,7 +16,7 @@ TMP_DIR = Path(os.getenv("TMP_DIR", "/temp_dir"))
 # Debug
 #
 
-DEBUG = string_to_bool(os.getenv("FLASK_DEBUG", "false"))
+DEBUG = string_to_bool(os.getenv("IS_DEBUG", "false"))
 FLASK_PORT = int(os.getenv("FLASK_PORT", "5000"))
 
 #

@@ -15,7 +15,7 @@
                 "CONFIG_DIR": "./.local/config",
                 "SHOW_DIR": "./.local/tvshows",
                 "TMP_DIR": "./.local/tmp",
-                "FLASK_DEBUG": "true"
+                "IS_DEBUG": "true"
             }
         },
         {
