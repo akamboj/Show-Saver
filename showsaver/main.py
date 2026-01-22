@@ -1,7 +1,6 @@
 import downloader
 
 import os
-from version import __version__
 import queue
 import threading
 import time
@@ -11,6 +10,8 @@ from env import (
     CONFIG_DIR, SHOW_DIR, DEBUG, FLASK_PORT, URL
 )
 from flask import Flask, jsonify, request, render_template
+from sonarr import is_sonarr_enabled
+from version import __version__
 
 # Enable remote debugging when debugging is enabled
 if DEBUG:
@@ -97,7 +98,7 @@ def get_queue():
 
 
 def download_worker():
-    # Background worker that processes download queue
+    """Background worker that processes download queue"""
     print('Download thread started.')
     while True:
         time.sleep(2)
@@ -208,6 +209,10 @@ def _initialize():
         create_config_files()
 
         print("yt-dlp version: " + yt_dlp.version.__version__)
+        if is_sonarr_enabled():
+            print("Sonarr integration enabled")
+        else:
+            print("Sonarr integration disabled")
 
         urls_to_process = get_urls_to_process()
         for url in urls_to_process:
