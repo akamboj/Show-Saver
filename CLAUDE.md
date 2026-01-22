@@ -57,12 +57,17 @@ env.py
 | SHOW_URL | (empty) | Single URL to queue on startup |
 | AUTO_CLEANUP_TMP | true | Delete temp files after processing |
 | PORT | 5000 | Flask server port |
+| SONARR_URL | (empty) | Sonarr API URL (e.g., http://localhost:8989) |
+| SONARR_API_KEY | (empty) | Sonarr API key for authentication |
 
 ### Authentication
 Uses `.netrc` file in CONFIG_DIR for site credentials. The netrc_location is passed to yt-dlp.
 
 ### Show Name Overrides
 `SHOW_NAME_OVERRIDES` dict in downloader.py maps metadata names to corrected folder names (e.g., 'Very Important People' → 'Very Important People (2023)').
+
+### Sonarr Integration
+Optional integration that triggers a series rescan in Sonarr after downloading. Configure `SONARR_URL` and `SONARR_API_KEY` to enable. The integration is non-blocking - Sonarr failures are logged as warnings but never cause downloads to fail.
 
 ## CI/CD
 

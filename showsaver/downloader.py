@@ -4,6 +4,7 @@ import yt_dlp
 from env import (
     CONFIG_DIR, TMP_DIR, DO_CLEANUP
 )
+from sonarr import refresh_and_rescan_series
 
 SHOW_NAME_OVERRIDES = {
     'Very Important People' : 'Very Important People (2023)'
@@ -140,6 +141,14 @@ def process_url(show_url, desired_destination, progress_callback=None):
     show_path = download_show(show_url, info_dict, progress_callback)
 
     copy_to_destination(info_dict, show_path, str(desired_destination))
+
+    # Trigger Sonarr rescan (optional, non-blocking)
+    try:
+        show_name = info_dict.get('series')
+        if show_name:
+            refresh_and_rescan_series(show_name, SHOW_NAME_OVERRIDES)
+    except Exception as e:
+        print(f"Sonarr integration warning: {e}")
 
     if DO_CLEANUP:
         if os.path.exists(show_path):

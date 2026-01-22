@@ -30,3 +30,10 @@ URL = os.getenv("SHOW_URL", "")
 #
 
 DO_CLEANUP = string_to_bool(os.getenv("AUTO_CLEANUP_TMP", "true"))
+
+#
+# Sonarr Integration (optional)
+#
+
+SONARR_URL = os.getenv("SONARR_URL", "")  # e.g., "http://localhost:8989"
+SONARR_API_KEY = os.getenv("SONARR_API_KEY", "")
