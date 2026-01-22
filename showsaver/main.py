@@ -99,6 +99,7 @@ def download_worker():
     # Background worker that processes download queue
     print('Download thread started.')
     while True:
+        time.sleep(2)
         try:
             item = download_queue.get(timeout=1)
             if item is None:
