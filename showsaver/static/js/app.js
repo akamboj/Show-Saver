@@ -236,9 +236,10 @@ async function fetchNewReleases() {
         const data = await response.json();
 
         if (data.success) {
-            renderReleases(data.videos);
+            const limitedVideos = data.videos.slice(0, 9);
+            renderReleases(limitedVideos);
             // Async fetch details for each video
-            fetchAllEpisodeDetails(data.videos);
+            fetchAllEpisodeDetails(limitedVideos);
         } else {
             releasesGrid.innerHTML = `<div class="error-releases">Failed to load releases</div>`;
         }
