@@ -1,4 +1,5 @@
 import downloader
+import dropout
 
 import os
 import queue
@@ -11,7 +12,6 @@ from env import (
 )
 from flask import Flask, jsonify, request, render_template
 from sonarr import is_sonarr_enabled
-from dropout import get_new_releases
 from version import __version__
 
 # Enable remote debugging when debugging is enabled
@@ -106,9 +106,9 @@ def get_queue():
 
 @app.route('/dropout/new-releases', methods=['GET'])
 def dropout_new_releases():
-    """Get list of new releases from Dropout TV."""
+    """Get list of new releases from Dropout"""
     force_refresh = request.args.get('refresh', '').lower() == 'true'
-    result = get_new_releases(force_refresh=force_refresh)
+    result = dropout.get_new_releases(force_refresh=force_refresh)
 
     if result['success']:
         return jsonify({
@@ -122,6 +122,26 @@ def dropout_new_releases():
             'success': False,
             'message': result.get('error', 'Failed to fetch new releases'),
             'videos': []
+        }), 503
+
+
+@app.route('/dropout/info', methods=['GET'])
+def dropout_get_info():
+    """Get list of new releases from Dropout"""
+    episode_url = request.args.get('episode', '')
+
+    result = dropout.get_epsiode_info(episode_url)
+
+    if result['success']:
+        return jsonify({
+            'success': True,
+            'info': result['info']
+        })
+    else:
+        return jsonify({
+            'success': False,
+            'message': result.get('error', 'Failed to fetch episode info'),
+            'info': None
         }), 503
 
 
