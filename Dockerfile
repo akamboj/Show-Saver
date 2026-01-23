@@ -32,3 +32,5 @@ COPY ./requirements-dev.txt /app/
 RUN pip install --requirement /app/requirements-dev.txt --root-user-action=ignore
 
 EXPOSE 5678
+
+CMD ["python", "main.py"]

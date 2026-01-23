@@ -22,6 +22,7 @@
             "name": "Docker: Attach",
             "type": "debugpy",
             "request": "attach",
+            "subProcess": false,
             "connect": {
                 "host": "localhost",
                 "port": 5678

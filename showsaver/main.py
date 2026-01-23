@@ -16,8 +16,14 @@ from version import __version__
 # Enable remote debugging when debugging is enabled
 if DEBUG:
     import debugpy
-    debugpy.listen(('0.0.0.0', 5678))
-    print('Debugpy listening on port 5678. Waiting for debugger to attach...')
+    debugpy.configure(subProcess=False)  # Disable subprocess debugging for Docker
+    try:
+        debugpy.listen(('0.0.0.0', 5678))
+        print('Debugpy listening on port 5678.')
+    except RuntimeError:
+        # Already listening (VS Code launched through debugpy)
+        pass
+    print('Waiting for debugger to attach...')
     debugpy.wait_for_client()
     print('Debugger attached!')
 
@@ -231,7 +237,7 @@ _initialize()
 
 
 def main():
-    app.run(debug=DEBUG, host='0.0.0.0', port=FLASK_PORT)
+    app.run(debug=DEBUG, host='0.0.0.0', port=FLASK_PORT, use_reloader=False)
 
 
 if __name__ == "__main__":
