@@ -8,7 +8,7 @@ import time
 import yt_dlp
 from datetime import datetime
 from env import (
-    CONFIG_DIR, SHOW_DIR, DEBUG, FLASK_PORT, URL
+    CONFIG_DIR, SHOW_DIR, DEBUG, WAIT_FOR_DEBUGGER, FLASK_PORT, URL
 )
 from flask import Flask, jsonify, request, render_template
 from sonarr import is_sonarr_enabled
@@ -22,11 +22,11 @@ if DEBUG:
         debugpy.listen(('0.0.0.0', 5678))
         print('Debugpy listening on port 5678.')
     except RuntimeError:
-        # Already listening (VS Code launched through debugpy)
         pass
-    print('Waiting for debugger to attach...')
-    debugpy.wait_for_client()
-    print('Debugger attached!')
+    if WAIT_FOR_DEBUGGER:
+        print('Waiting for debugger to attach...')
+        debugpy.wait_for_client()
+        print('Debugger attached!')
 
 URL_LIST_FILE_PATH = os.path.join(CONFIG_DIR, 'urls.txt')
 

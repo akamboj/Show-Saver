@@ -209,14 +209,17 @@ function renderReleases(videos) {
         return;
     }
 
+    // Placeholder thumbnail: dark background with TV/monitor icon
+    const placeholderThumb = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 320 180'%3E%3Crect fill='%232a2a2a' width='320' height='180'/%3E%3Crect x='100' y='45' width='120' height='75' rx='4' fill='none' stroke='%23555' stroke-width='4'/%3E%3Crect x='110' y='55' width='100' height='55' fill='%23333'/%3E%3Crect x='140' y='120' width='40' height='8' fill='%23555'/%3E%3Crect x='130' y='128' width='60' height='6' rx='2' fill='%23555'/%3E%3C/svg%3E";
+
     releasesGrid.innerHTML = videos.map(video => `
         <div class="release-card" data-url="${video.url}" title="Click to queue download">
             <div class="release-thumbnail">
-                <img src="${video.thumbnail}" alt="${video.title}" loading="lazy">
+                <img src="${video.thumbnail || placeholderThumb}" alt="${video.title || 'Video'}" loading="lazy">
                 ${video.duration ? `<span class="release-duration">${formatDuration(video.duration)}</span>` : ''}
             </div>
             <div class="release-info">
-                <div class="release-title">${video.title}</div>
+                <div class="release-title">${video.title || (video.url.includes('videos/') ? video.url.split('videos/').pop() : video.url)}</div>
             </div>
         </div>
     `).join('');
