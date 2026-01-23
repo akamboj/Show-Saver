@@ -191,3 +191,135 @@ textInput.addEventListener('input', () => {
         responseDiv.classList.remove('show');
     }
 });
+
+// Dropout New Releases Panel
+const releasesGrid = document.getElementById('releasesGrid');
+const refreshReleasesBtn = document.getElementById('refreshReleases');
+
+function formatDuration(seconds) {
+    if (!seconds) return '';
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${mins}:${secs.toString().padStart(2, '0')}`;
+}
+
+function renderReleases(videos) {
+    if (!videos || videos.length === 0) {
+        releasesGrid.innerHTML = '<div class="empty-releases">No releases available</div>';
+        return;
+    }
+
+    releasesGrid.innerHTML = videos.map(video => `
+        <div class="release-card" data-url="${video.url}" title="Click to queue download">
+            <div class="release-thumbnail">
+                <img src="${video.thumbnail}" alt="${video.title}" loading="lazy">
+                ${video.duration ? `<span class="release-duration">${formatDuration(video.duration)}</span>` : ''}
+            </div>
+            <div class="release-info">
+                <div class="release-title">${video.title}</div>
+            </div>
+        </div>
+    `).join('');
+
+    // Add click handlers to cards
+    releasesGrid.querySelectorAll('.release-card').forEach(card => {
+        card.addEventListener('click', () => queueRelease(card.dataset.url));
+    });
+}
+
+async function fetchNewReleases() {
+    releasesGrid.innerHTML = '<div class="loading-releases">Loading releases...</div>';
+    refreshReleasesBtn.classList.add('spinning');
+
+    try {
+        const response = await fetch('/dropout/new-releases');
+        const data = await response.json();
+
+        if (data.success) {
+            renderReleases(data.videos);
+            // Async fetch details for each video
+            fetchAllEpisodeDetails(data.videos);
+        } else {
+            releasesGrid.innerHTML = `<div class="error-releases">Failed to load releases</div>`;
+        }
+    } catch (error) {
+        console.error('Failed to fetch releases:', error);
+        releasesGrid.innerHTML = `<div class="error-releases">Failed to load releases</div>`;
+    } finally {
+        refreshReleasesBtn.classList.remove('spinning');
+    }
+}
+
+function fetchAllEpisodeDetails(videos) {
+    videos.forEach(video => {
+        fetchEpisodeInfo(video.url);
+    });
+}
+
+async function fetchEpisodeInfo(url) {
+    try {
+        const response = await fetch(`/dropout/info?episode=${encodeURIComponent(url)}`);
+        const data = await response.json();
+
+        if (data.success) {
+            updateReleaseCard(url, data.info);
+        }
+    } catch (error) {
+        console.error(`Failed to fetch info for ${url}:`, error);
+    }
+}
+
+function updateReleaseCard(url, info) {
+    const card = releasesGrid.querySelector(`[data-url="${url}"]`);
+    if (!card) return;
+
+    // Update thumbnail
+    const img = card.querySelector('.release-thumbnail img');
+    if (img && info.thumbnail) {
+        img.src = info.thumbnail;
+    }
+
+    // Update title
+    const title = card.querySelector('.release-title');
+    if (title && info.title) {
+        title.textContent = info.title;
+    }
+
+    // Update duration
+    const thumbnailDiv = card.querySelector('.release-thumbnail');
+    if (info.duration && thumbnailDiv) {
+        let durationSpan = thumbnailDiv.querySelector('.release-duration');
+        if (!durationSpan) {
+            durationSpan = document.createElement('span');
+            durationSpan.className = 'release-duration';
+            thumbnailDiv.appendChild(durationSpan);
+        }
+        durationSpan.textContent = formatDuration(info.duration);
+    }
+
+    // Mark card as loaded
+    card.classList.add('details-loaded');
+}
+
+async function queueRelease(url) {
+    try {
+        const response = await fetch('/submit', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ text: url })
+        });
+
+        const data = await response.json();
+
+    } catch (error) {
+        console.error('Failed to queue new release:', error);
+    }
+}
+
+// Event listeners for releases panel
+refreshReleasesBtn.addEventListener('click', fetchNewReleases);
+
+// Load releases on page load
+fetchNewReleases();
