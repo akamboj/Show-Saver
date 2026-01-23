@@ -216,6 +216,11 @@ def create_job_status(job_id, url):
 
 
 def queue_url(url):
+    # Make sure not already in queue
+    for job_id, job_status in download_status.items():
+        if url == job_status.get('url', ''):
+            return
+
     # Generate job ID
     job_id = generate_job_id()
     # Add to queue
