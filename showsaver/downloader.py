@@ -88,10 +88,23 @@ def download_show(show_url, info_dict, progress_callback=None):
     dlp_opts = {
         **BASE_YT_OPTS,
         'outtmpl' : {'default' : '%(series)s - S%(season_number)02dE%(episode_number)02d - %(title)s WEBDL-1080p.%(ext)s'},
-        'postprocessors': [{
-            'key': 'FFmpegEmbedSubtitle',
-            'already_have_subtitle': False
-        }],
+        'postprocessors': [
+            {
+                'api': 'https://sponsor.ajay.app',
+                'key': 'SponsorBlock',
+                'when': 'after_filter',
+                'categories': ['sponsor', 'selfpromo', 'interaction', 'intro', 'outro']
+            },
+            {
+                'key': 'ModifyChapters',
+                'remove_sponsor_segments': ['sponsor', 'selfpromo', 'interaction', 'intro', 'outro'],
+                'sponsorblock_chapter_title': '[SponsorBlock]: ' '%(category_names)l',
+            },
+            {
+                'key': 'FFmpegEmbedSubtitle',
+                'already_have_subtitle': False
+            }
+        ],
         'writesubtitles' : True,
         'progress_hooks' : [progress_hook_callback]
     }
