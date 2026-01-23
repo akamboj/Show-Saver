@@ -1,6 +1,7 @@
 import time
 import yt_dlp
 from downloader import BASE_YT_OPTS
+from urllib.parse import urlsplit, urlunsplit
 
 DROPOUT_NEW_RELEASES_URL = "https://watch.dropout.tv/new-releases"
 
@@ -39,9 +40,12 @@ def get_new_releases(force_refresh=False):
 
         videos = []
         for entry in info.get('entries', []):
+            url = entry.get('url') or entry.get('webpage_url')
+            url = url.replace('/new-releases', '')
+
             extracted_data = {
                 'title': entry.get('title'),
-                'url': entry.get('url') or entry.get('webpage_url'),
+                'url': url,
                 'thumbnail': entry.get('thumbnail'),
                 'duration': entry.get('duration'),  # seconds
                 'id': entry.get('id'),
