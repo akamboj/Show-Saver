@@ -9,13 +9,13 @@ ENV PYTHONUNBUFFERED=1
 ENV AUTO_CLEANUP_TMP=1
 
 
-WORKDIR /app
-
 RUN apt-get update && \
     apt-get install -y ffmpeg && \
     apt-get clean
 
-COPY ./requirements.txt /app/
+WORKDIR /app
+
+COPY ./requirements.txt /app/requirements.txt
 RUN pip install --requirement /app/requirements.txt --root-user-action=ignore
 COPY ./showsaver /app
 
@@ -28,7 +28,7 @@ CMD ["gunicorn", "--bind", "0.0.0.0:5000", "main:app"]
 # ===== Development stage =====
 FROM base AS dev
 
-COPY ./requirements-dev.txt /app/
+COPY ./requirements-dev.txt /app/requirements-dev.txt
 RUN pip install --requirement /app/requirements-dev.txt --root-user-action=ignore
 
 EXPOSE 5678
