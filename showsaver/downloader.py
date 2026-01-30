@@ -1,4 +1,5 @@
 import os
+import requests
 import shutil
 import yt_dlp
 from env import (
@@ -136,6 +137,30 @@ def copy_to_destination(info_dict, show_path, base_destination_path):
     print("Copy complete!")
 
 
+def find_corrected_url(show_url, info_dict):
+    show_name = info_dict['series']
+    if 'Dimension 20:' in show_name:
+        print(f'Attempting to correct url: {show_url}')
+        # Loop through seasons
+        # https://watch.dropout.tv/dimension-20/season:27/videos/poppy-persona-non-grata
+        # https://watch.dropout.tv/videos/poppy-persona-non-grata
+        file_name_part = show_url.rsplit('/', 1)[-1]
+        for i in range(1, 100):
+            url_to_try = f'https://watch.dropout.tv/dimension-20/season:{i}/videos/{file_name_part}'
+            try:
+                print(f'Trying url: {url_to_try}')
+                r = requests.head(url_to_try)
+                if r.status_code == 404:
+                    continue
+
+                print(f'Found corrected url: {url_to_try}')
+                new_info_dict = get_metadata(url_to_try)
+                return url_to_try, new_info_dict
+            except Exception as e:
+                pass
+    return None, None
+
+
 def process_urls(url_list, desired_destination):
     print('********** Processing Urls: **********')
     if len(url_list) > 0:
@@ -150,6 +175,11 @@ def process_urls(url_list, desired_destination):
 
 def process_url(show_url, desired_destination, progress_callback=None):
     info_dict = get_metadata(show_url)
+
+    corrected_url, corrected_info_dict = find_corrected_url(show_url, info_dict)
+    if corrected_url and corrected_info_dict:
+        show_url = corrected_url
+        info_dict = corrected_info_dict
 
     show_path = download_show(show_url, info_dict, progress_callback)
 
