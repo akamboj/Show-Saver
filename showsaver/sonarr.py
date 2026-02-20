@@ -2,7 +2,7 @@ import requests
 from env import SONARR_URL, SONARR_API_KEY
 
 
-def is_sonarr_enabled():
+def is_sonarr_enabled() -> bool:
     """Check if Sonarr integration is configured."""
     return bool(SONARR_URL and SONARR_API_KEY)
 

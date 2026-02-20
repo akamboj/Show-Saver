@@ -19,7 +19,7 @@ _episode_cache = {}
 EPISODE_CACHE_TTL = 3600  # 1 hour for individual episodes
 
 
-def time_to_sec(t):
+def time_to_sec(t) -> int:
     if not ':' in t:
         return int(t)
     

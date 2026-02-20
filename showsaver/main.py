@@ -12,6 +12,7 @@ from env import (
 )
 from flask import Flask, jsonify, request, render_template
 from sonarr import is_sonarr_enabled
+from typing import Any
 from version import __version__
 
 # Enable remote debugging when debugging is enabled
@@ -197,11 +198,11 @@ def download_worker():
             continue
 
 
-def generate_job_id():
+def generate_job_id() -> str:
     return f"{int(time.time())}_{len(download_status)}"
 
 
-def create_job_status(job_id, url):
+def create_job_status(job_id, url) -> dict[str, Any]:
     job_status = {
         'id': job_id,
         'url': url,
@@ -215,7 +216,7 @@ def create_job_status(job_id, url):
     return job_status
 
 
-def queue_url(url):
+def queue_url(url) -> str:
     # Make sure not already in queue
     for job_id, job_status in download_status.items():
         if url == job_status.get('url', ''):
@@ -233,7 +234,7 @@ def queue_url(url):
     return job_id
 
 
-def get_urls_to_process():
+def get_urls_to_process() -> list[str]:
     urls = []
     if URL:
         urls.append(URL)
