@@ -39,32 +39,38 @@ def _get_new_releases_bs():
     response = requests.get(DROPOUT_NEW_RELEASES_URL)
 
     if response.status_code == 200:
-        soup = BeautifulSoup(response.text, 'html.parser')
+        try:
+            soup = BeautifulSoup(response.text, 'html.parser')
 
-        videos = []
-        list_items = soup.find_all('li', class_='js-collection-item')
-        for list_item in list_items:
-            thumbnail = list_item.img['src']
-            link = list_item.find('a', href=True)
-            title = list_item.find('strong')['title']
-            url = link['href'].replace('/new-releases', '')
-            id = int(list_item['data-item-id'])
+            videos = []
+            list_items = soup.find_all('li', class_='js-collection-item')
+            for list_item in list_items:
+                if list_item:
+                    thumbnail = list_item.img['src']
+                    link = list_item.find('a', href=True)
+                    title = list_item.find('strong')['title']
+                    url = link['href'].replace('/new-releases', '')
+                    id = int(list_item['data-item-id'])
 
-            duration_container = list_item.find('div', class_='duration-container')
-            duration_txt = duration_container.text.strip()
-            duration = time_to_sec(duration_txt)
+                    duration_container = list_item.find('div', class_='duration-container')
+                    assert(duration_container)
+                    duration_txt = duration_container.text.strip()
+                    duration = time_to_sec(duration_txt)
 
-            extracted_data = {
-                'title': title,
-                'url': url,
-                'thumbnail': thumbnail,
-                'duration': duration,  # seconds
-                'id': id,
-            }
+                    extracted_data = {
+                        'title': title,
+                        'url': url,
+                        'thumbnail': thumbnail,
+                        'duration': duration,  # seconds
+                        'id': id,
+                    }
 
-            videos.append(extracted_data)
+                    videos.append(extracted_data)
 
-        return videos
+            return videos
+        except Exception as e:
+            print(e)
+            return None
     else:
         print(f"Failed to retrieve the page. Status code: {response.status_code}")
 
