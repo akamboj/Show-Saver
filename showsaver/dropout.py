@@ -53,19 +53,19 @@ def _get_new_releases_bs():
                     id = int(list_item['data-item-id'])
 
                     duration_container = list_item.find('div', class_='duration-container')
-                    assert(duration_container)
-                    duration_txt = duration_container.text.strip()
-                    duration = time_to_sec(duration_txt)
+                    if duration_container:
+                        duration_txt = duration_container.text.strip()
+                        duration = time_to_sec(duration_txt)
 
-                    extracted_data = {
-                        'title': title,
-                        'url': url,
-                        'thumbnail': thumbnail,
-                        'duration': duration,  # seconds
-                        'id': id,
-                    }
+                        extracted_data = {
+                            'title': title,
+                            'url': url,
+                            'thumbnail': thumbnail,
+                            'duration': duration,  # seconds
+                            'id': id,
+                        }
 
-                    videos.append(extracted_data)
+                        videos.append(extracted_data)
 
             return videos
         except Exception as e:
