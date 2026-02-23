@@ -101,7 +101,8 @@ def get_queue():
             'queued': queued,
             'downloading': downloading,
             'completed': completed,
-            'queue_size': len(queued)
+            'queue_size': len(queued),
+            'total_queue_size': len(queued) + len(downloading)
         })
 
 
