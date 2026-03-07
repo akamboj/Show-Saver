@@ -208,7 +208,7 @@ def process_url(show_url, desired_destination, progress_callback=None, processor
 
     show_path = download_show(show_url, info_dict, progress_callback, processor)
 
-    copy_to_destination(info_dict, show_path, str(desired_destination))
+    copy_to_destination(info_dict, show_path, str(desired_destination), processor)
 
     # Trigger Sonarr rescan (optional, non-blocking)
     try:

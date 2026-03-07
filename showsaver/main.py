@@ -168,7 +168,7 @@ def download_worker():
             try:
                 def update_progress(progress_info):
                     with thread_lock:
-                        download_status[job_id]['progress'] = int(progress_info['percent'])
+                        download_status[job_id]['progress'] = int(progress_info.get('percent', 0))
                         download_status[job_id]['step'] = progress_info.get('step', 1)
                         download_status[job_id]['step_type'] = progress_info.get('step_type', 'downloading')
                         download_status[job_id]['total_steps'] = progress_info.get('total_steps', 1)
@@ -230,7 +230,7 @@ def queue_url(url) -> str:
     # Make sure not already in queue
     for job_id, job_status in download_status.items():
         if url == job_status.get('url', '') and job_status.status != 'failed':
-            return
+            return ''
 
     # Generate job ID
     job_id = generate_job_id()
