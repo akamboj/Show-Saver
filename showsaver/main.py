@@ -173,7 +173,16 @@ def download_worker():
                         download_status[job_id]['step_type'] = progress_info.get('step_type', 'downloading')
                         download_status[job_id]['total_steps'] = progress_info.get('total_steps', 1)
 
-                downloader.process_url(url, SHOW_DIR, progress_callback=update_progress)
+                '''
+                Pass in processor (dropout)
+                processor can transform info_dict
+                look for series = 'Very Important People' and titles contains 'Last Looks'
+                Change both season number and episode number to 0
+                Change season to Specials
+
+                Potentially trigger Sonarr to do a rename on the show
+                '''
+                downloader.process_url(url, SHOW_DIR, progress_callback=update_progress, processor=dropout.DropoutProcessor())
 
                 file_path = ''
                 file_size = 0

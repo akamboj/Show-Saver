@@ -18,6 +18,32 @@ CACHE_TTL = 300  # 5 minutes
 _episode_cache = {}
 EPISODE_CACHE_TTL = 3600  # 1 hour for individual episodes
 
+SHOW_NAME_OVERRIDES = {
+    'Very Important People' : 'Very Important People (2023)'
+}
+
+class DropoutProcessor:
+    def process_info_dict(self, info_dict):
+        series = info_dict.get('series', '')
+        title = info_dict.get('title', '')
+
+        if series == 'Very Important People' and 'Last Looks' in title:
+            info_dict['season_number'] = 0
+            info_dict['episode_number'] = 0
+
+    def process_dlp_opts(self, dlp_opts, info_dict):
+        series = info_dict.get('series', '')
+        title = info_dict.get('title', '')
+
+        if series == 'Very Important People' and 'Last Looks' in title:
+            dlp_opts['outtmpl'] = {'default' : '%(series)s - S00E00 - %(title)s WEBDL-1080p.%(ext)s'}
+
+    def process_show_name(self, show_name):
+        if show_name in SHOW_NAME_OVERRIDES:
+            return SHOW_NAME_OVERRIDES[show_name]
+        return show_name
+
+
 
 def time_to_sec(t) -> int:
     if not ':' in t:
