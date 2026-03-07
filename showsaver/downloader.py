@@ -11,6 +11,24 @@ SHOW_NAME_OVERRIDES = {
     'Very Important People' : 'Very Important People (2023)'
 }
 
+YT_REPLACE_COLON_ACTION = {
+    'actions': [
+        (yt_dlp.postprocessor.metadataparser.MetadataParserPP.replacer,
+        'title',
+        ':',
+        ''),
+        (yt_dlp.postprocessor.metadataparser.MetadataParserPP.replacer,
+        'playlist',
+        ':',
+        ''),
+        (yt_dlp.postprocessor.metadataparser.MetadataParserPP.replacer,
+        'playlist_title',
+        ':',
+        '')
+    ],
+    'key': 'MetadataParser',
+    'when': 'pre_process'
+}
 
 def progress_hook(d):
     print(d['_default_template'])
@@ -35,7 +53,10 @@ BASE_YT_OPTS = {
 def get_metadata(show_url):
     dlp_opts = {
         **BASE_YT_OPTS,
-        'skip_download' : True
+        'skip_download' : True,
+        'postprocessors': [
+            YT_REPLACE_COLON_ACTION
+        ]
     }
     yt = yt_dlp.YoutubeDL(dlp_opts)
 
@@ -104,7 +125,8 @@ def download_show(show_url, info_dict, progress_callback=None):
             {
                 'key': 'FFmpegEmbedSubtitle',
                 'already_have_subtitle': False
-            }
+            },
+            YT_REPLACE_COLON_ACTION
         ],
         'writesubtitles' : True,
         'progress_hooks' : [progress_hook_callback]
