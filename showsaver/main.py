@@ -220,7 +220,7 @@ def create_job_status(job_id, url) -> dict[str, Any]:
 def queue_url(url) -> str:
     # Make sure not already in queue
     for job_id, job_status in download_status.items():
-        if url == job_status.get('url', ''):
+        if url == job_status.get('url', '') and job_status.status != 'failed':
             return
 
     # Generate job ID
