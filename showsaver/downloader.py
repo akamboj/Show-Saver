@@ -16,15 +16,15 @@ YT_REPLACE_COLON_ACTION = {
         (yt_dlp.postprocessor.metadataparser.MetadataParserPP.replacer,
         'title',
         ':',
-        ''),
+        ' -'),
         (yt_dlp.postprocessor.metadataparser.MetadataParserPP.replacer,
         'playlist',
         ':',
-        ''),
+        ' -'),
         (yt_dlp.postprocessor.metadataparser.MetadataParserPP.replacer,
         'playlist_title',
         ':',
-        '')
+        ' -')
     ],
     'key': 'MetadataParser',
     'when': 'pre_process'
