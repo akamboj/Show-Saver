@@ -14,6 +14,8 @@ const queueList = document.getElementById('queueList');
 
 let activeJobId = null;
 let statusInterval = null;
+let connectionLost = false;
+const connectionToast = document.getElementById('connectionError');
 
 function formatStepType(stepType) {
     const labels = {
@@ -29,6 +31,11 @@ async function updateQueueStatus() {
     try {
         const response = await fetch('/queue');
         const data = await response.json();
+
+        if (connectionLost) {
+            connectionLost = false;
+            connectionToast.classList.remove('show');
+        }
 
         if (data.success) {
             const allItems = [
@@ -61,6 +68,10 @@ async function updateQueueStatus() {
         }
     } catch (error) {
         console.error('Failed to update queue status:', error);
+        if (!connectionLost) {
+            connectionLost = true;
+            connectionToast.classList.add('show');
+        }
     }
 }
 
