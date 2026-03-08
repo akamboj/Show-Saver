@@ -1,6 +1,7 @@
 import downloader
 import dropout
 
+import logging
 import os
 import queue
 import threading
@@ -32,6 +33,12 @@ if DEBUG:
 URL_LIST_FILE_PATH = os.path.join(CONFIG_DIR, 'urls.txt')
 
 app = Flask(__name__)
+
+class _NoQueueFilter(logging.Filter):
+    def filter(self, record):
+        return '/queue' not in record.getMessage()
+
+logging.getLogger('werkzeug').addFilter(_NoQueueFilter())
 
 # Download queue and status tracking
 download_queue = queue.Queue()
