@@ -24,24 +24,29 @@ SHOW_NAME_OVERRIDES = {
 
 class DropoutProcessor:
     def process_info_dict(self, info_dict):
-        series = info_dict.get('series', '')
-        title = info_dict.get('title', '')
 
-        if series == 'Very Important People' and 'Last Looks' in title:
+        if self.__is_last_look(info_dict):
             info_dict['season_number'] = 0
             info_dict['episode_number'] = 0
 
     def process_dlp_opts(self, dlp_opts, info_dict):
-        series = info_dict.get('series', '')
-        title = info_dict.get('title', '')
 
-        if series == 'Very Important People' and 'Last Looks' in title:
+        if self.__is_last_look(info_dict):
             dlp_opts['outtmpl'] = {'default' : '%(series)s - S00E00 - %(title)s WEBDL-1080p.%(ext)s'}
 
     def process_show_name(self, show_name):
+
         if show_name in SHOW_NAME_OVERRIDES:
             return SHOW_NAME_OVERRIDES[show_name]
         return show_name
+    
+    def __is_last_look(self, info_dict):
+        
+        series = info_dict.get('series', '')
+        title = info_dict.get('title', '')
+        if 'Very Important People' in series and 'Last Looks' in title:
+            return True
+        return False
 
 
 
