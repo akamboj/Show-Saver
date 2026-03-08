@@ -210,7 +210,7 @@ def process_url(show_url, desired_destination, progress_callback=None, processor
 
     copy_to_destination(info_dict, show_path, str(desired_destination), processor)
 
-    # Trigger Sonarr rescan (optional, non-blocking)
+    # Trigger Sonarr rescan (optional)
     try:
         show_name = info_dict.get('series')
         if show_name:
