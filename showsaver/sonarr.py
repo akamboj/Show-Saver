@@ -97,7 +97,7 @@ def rename_series(series_ids):
     return response.json()
 
 
-def refresh_and_rescan_series(show_name, override_name=None):
+def refresh_and_rescan_series(show_name, override_name=None, do_rename=False):
     """
     Main entry point: find series and trigger rescan.
 
@@ -118,6 +118,7 @@ def refresh_and_rescan_series(show_name, override_name=None):
         return False
 
     rescan_series(series_id)
-    rename_series([series_id])
+    if do_rename:
+        rename_series([series_id])
     print(f"Sonarr: Triggered rescan for series '{show_name}' (ID: {series_id})")
     return True

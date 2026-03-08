@@ -216,9 +216,11 @@ def process_url(show_url, desired_destination, progress_callback=None, processor
     try:
         show_name = info_dict.get('series')
         if show_name:
+            should_trigger_rename = False
             if processor:
                 override_name = processor.process_show_name(show_name)
-            refresh_and_rescan_series(show_name, override_name)
+                should_trigger_rename = processor.should_trigger_rename(info_dict)
+            refresh_and_rescan_series(show_name, override_name, should_trigger_rename)
     except Exception as e:
         print(f"Sonarr integration warning: {e}")
 
