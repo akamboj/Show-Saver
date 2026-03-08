@@ -77,6 +77,26 @@ def rescan_series(series_id):
     return response.json()
 
 
+def rename_series(series_ids):
+    """
+    Trigger a rename for a specific series in Sonarr.
+
+    Args:
+        series_id: The Sonarr series ID
+
+    Returns:
+        Command response from Sonarr
+    """
+    url = f"{SONARR_URL.rstrip('/')}/api/v3/command"
+    payload = {
+        "name": "RenameSeries",
+        "seriesIds": series_ids
+    }
+    response = requests.post(url, headers=_get_headers(), json=payload, timeout=10)
+    response.raise_for_status()
+    return response.json()
+
+
 def refresh_and_rescan_series(show_name, override_name=None):
     """
     Main entry point: find series and trigger rescan.
@@ -98,5 +118,6 @@ def refresh_and_rescan_series(show_name, override_name=None):
         return False
 
     rescan_series(series_id)
+    rename_series([series_id])
     print(f"Sonarr: Triggered rescan for series '{show_name}' (ID: {series_id})")
     return True
