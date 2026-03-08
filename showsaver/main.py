@@ -1,6 +1,7 @@
 import downloader
 import dropout
 
+import logging
 import os
 import queue
 import threading
@@ -32,6 +33,12 @@ if DEBUG:
 URL_LIST_FILE_PATH = os.path.join(CONFIG_DIR, 'urls.txt')
 
 app = Flask(__name__)
+
+class _NoQueueFilter(logging.Filter):
+    def filter(self, record):
+        return '/queue' not in record.getMessage()
+
+logging.getLogger('werkzeug').addFilter(_NoQueueFilter())
 
 # Download queue and status tracking
 download_queue = queue.Queue()
@@ -168,12 +175,21 @@ def download_worker():
             try:
                 def update_progress(progress_info):
                     with thread_lock:
-                        download_status[job_id]['progress'] = int(progress_info['percent'])
+                        download_status[job_id]['progress'] = int(progress_info.get('percent', 0))
                         download_status[job_id]['step'] = progress_info.get('step', 1)
                         download_status[job_id]['step_type'] = progress_info.get('step_type', 'downloading')
                         download_status[job_id]['total_steps'] = progress_info.get('total_steps', 1)
 
-                downloader.process_url(url, SHOW_DIR, progress_callback=update_progress)
+                '''
+                Pass in processor (dropout)
+                processor can transform info_dict
+                look for series = 'Very Important People' and titles contains 'Last Looks'
+                Change both season number and episode number to 0
+                Change season to Specials
+
+                Potentially trigger Sonarr to do a rename on the show
+                '''
+                downloader.process_url(url, SHOW_DIR, progress_callback=update_progress, processor=dropout.DropoutProcessor())
 
                 file_path = ''
                 file_size = 0
@@ -221,7 +237,7 @@ def queue_url(url) -> str:
     # Make sure not already in queue
     for job_id, job_status in download_status.items():
         if url == job_status.get('url', '') and job_status.status != 'failed':
-            return
+            return ''
 
     # Generate job ID
     job_id = generate_job_id()

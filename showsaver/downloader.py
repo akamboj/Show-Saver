@@ -7,10 +7,6 @@ from env import (
 )
 from sonarr import refresh_and_rescan_series
 
-SHOW_NAME_OVERRIDES = {
-    'Very Important People' : 'Very Important People (2023)'
-}
-
 YT_REPLACE_COLON_ACTION = {
     'actions': [
         (yt_dlp.postprocessor.metadataparser.MetadataParserPP.replacer,
@@ -66,7 +62,7 @@ def get_metadata(show_url):
     return info_dict
 
 
-def download_show(show_url, info_dict, progress_callback=None):
+def download_show(show_url, info_dict, progress_callback=None, processor=None):
     download_state = {'current_step': 0, 'steps': [], 'last_filename': None}
 
     def progress_hook_callback(download_progress):
@@ -131,6 +127,8 @@ def download_show(show_url, info_dict, progress_callback=None):
         'writesubtitles' : True,
         'progress_hooks' : [progress_hook_callback]
     }
+    if processor:
+        processor.process_dlp_opts(dlp_opts, info_dict)
     yt = yt_dlp.YoutubeDL(dlp_opts)
 
     yt.download(show_url)
@@ -139,15 +137,17 @@ def download_show(show_url, info_dict, progress_callback=None):
     return show_path
 
 
-def copy_to_destination(info_dict, show_path, base_destination_path):
+def copy_to_destination(info_dict, show_path, base_destination_path, processor=None):
     show_name = info_dict['series']
     season_number = info_dict['season_number']
-    season_folder = 'Season ' + str(season_number)
+    season_folder = 'Specials' if season_number == 0 else 'Season ' + str(season_number)
     episode_filename = os.path.basename(show_path)
 
-    if show_name in SHOW_NAME_OVERRIDES:
-        episode_filename = episode_filename.replace(show_name, SHOW_NAME_OVERRIDES[show_name])
-        show_name = SHOW_NAME_OVERRIDES[show_name]
+    if processor:
+        new_show_name = processor.process_show_name(show_name)
+        if new_show_name != show_name:
+            episode_filename = episode_filename.replace(show_name, new_show_name)
+            show_name = new_show_name
 
     full_destination_path = os.path.join(base_destination_path, show_name, season_folder)
     full_episode_path = os.path.join(full_destination_path, episode_filename)
@@ -195,7 +195,7 @@ def process_urls(url_list, desired_destination):
         print("No initial Urls provided.")
 
 
-def process_url(show_url, desired_destination, progress_callback=None):
+def process_url(show_url, desired_destination, progress_callback=None, processor=None):
     info_dict = get_metadata(show_url)
 
     corrected_url, corrected_info_dict = find_corrected_url(show_url, info_dict)
@@ -203,15 +203,20 @@ def process_url(show_url, desired_destination, progress_callback=None):
         show_url = corrected_url
         info_dict = corrected_info_dict
 
-    show_path = download_show(show_url, info_dict, progress_callback)
+    if processor:
+        processor.process_info_dict(info_dict)
 
-    copy_to_destination(info_dict, show_path, str(desired_destination))
+    show_path = download_show(show_url, info_dict, progress_callback, processor)
 
-    # Trigger Sonarr rescan (optional, non-blocking)
+    copy_to_destination(info_dict, show_path, str(desired_destination), processor)
+
+    # Trigger Sonarr rescan (optional)
     try:
         show_name = info_dict.get('series')
         if show_name:
-            refresh_and_rescan_series(show_name, SHOW_NAME_OVERRIDES)
+            if processor:
+                override_name = processor.process_show_name(show_name)
+            refresh_and_rescan_series(show_name, override_name)
     except Exception as e:
         print(f"Sonarr integration warning: {e}")
 

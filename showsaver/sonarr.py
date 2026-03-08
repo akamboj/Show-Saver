@@ -23,7 +23,7 @@ def get_all_series():
     return response.json()
 
 
-def find_series_by_name(show_name, overrides=None):
+def find_series_by_name(show_name, override_name=None):
     """
     Find a series ID in Sonarr by show name.
 
@@ -34,11 +34,10 @@ def find_series_by_name(show_name, overrides=None):
     Returns:
         Series ID if found, None otherwise
     """
-    if overrides is None:
-        overrides = {}
+    if override_name:
+        # Apply override if present
+        search_name = override_name
 
-    # Apply override if present
-    search_name = overrides.get(show_name, show_name)
 
     series_list = get_all_series()
 
@@ -78,13 +77,33 @@ def rescan_series(series_id):
     return response.json()
 
 
-def refresh_and_rescan_series(show_name, overrides=None):
+def rename_series(series_ids):
+    """
+    Trigger a rename for a specific series in Sonarr.
+
+    Args:
+        series_id: The Sonarr series ID
+
+    Returns:
+        Command response from Sonarr
+    """
+    url = f"{SONARR_URL.rstrip('/')}/api/v3/command"
+    payload = {
+        "name": "RenameSeries",
+        "seriesIds": series_ids
+    }
+    response = requests.post(url, headers=_get_headers(), json=payload, timeout=10)
+    response.raise_for_status()
+    return response.json()
+
+
+def refresh_and_rescan_series(show_name, override_name=None):
     """
     Main entry point: find series and trigger rescan.
 
     Args:
         show_name: The show name from yt-dlp metadata
-        overrides: Dict of show name overrides
+        override_name: Potential overriden name of show
 
     Returns:
         True if rescan was triggered, False otherwise
@@ -92,12 +111,13 @@ def refresh_and_rescan_series(show_name, overrides=None):
     if not is_sonarr_enabled():
         return False
 
-    series_id = find_series_by_name(show_name, overrides)
+    series_id = find_series_by_name(show_name, override_name)
 
     if series_id is None:
         print(f"Sonarr: Series '{show_name}' not found in library")
         return False
 
     rescan_series(series_id)
+    rename_series([series_id])
     print(f"Sonarr: Triggered rescan for series '{show_name}' (ID: {series_id})")
     return True

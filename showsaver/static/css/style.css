@@ -550,6 +550,27 @@ button {
     color: var(--primary);
 }
 
+.connection-toast {
+    position: fixed;
+    bottom: 3rem;
+    right: 1rem;
+    background: #1e1e1e;
+    color: var(--primary);
+    border: 1px solid var(--primary);
+    border-radius: 6px;
+    padding: 0.5rem 0.875rem;
+    font-size: 0.8rem;
+    font-family: 'Karla', sans-serif;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.3s ease;
+    z-index: 200;
+}
+
+.connection-toast.show {
+    opacity: 1;
+}
+
 /* Releases Panel Styles */
 .releases-panel {
     background: #1e1e1e;
