@@ -113,6 +113,16 @@ def get_queue():
         })
 
 
+@app.route('/history', methods=['DELETE'])
+def clear_history():
+    with thread_lock:
+        download_history.clear()
+        completed_ids = [job_id for job_id, s in download_status.items() if s['status'] == 'completed']
+        for job_id in completed_ids:
+            del download_status[job_id]
+    return jsonify({'status': 'ok'})
+
+
 @app.route('/dropout/new-releases', methods=['GET'])
 def dropout_new_releases():
     """Get list of new releases from Dropout"""
@@ -236,7 +246,7 @@ def create_job_status(job_id, url) -> dict[str, Any]:
 def queue_url(url) -> str:
     # Make sure not already in queue
     for job_id, job_status in download_status.items():
-        if url == job_status.get('url', '') and job_status.status != 'failed':
+        if url == job_status.get('url', '') and job_status.get('status', '') != 'failed':
             return ''
 
     # Generate job ID

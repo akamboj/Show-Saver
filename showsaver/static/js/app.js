@@ -11,6 +11,7 @@ const statValue2 = document.getElementById('statValue2');
 const statLabel2 = document.getElementById('statLabel2');
 const queueStatus = document.getElementById('queueStatus');
 const queueList = document.getElementById('queueList');
+const clearHistoryBtn = document.getElementById('clearHistoryBtn');
 
 let activeJobId = null;
 let statusInterval = null;
@@ -43,6 +44,8 @@ async function updateQueueStatus() {
                 ...data.queued.map(q => ({...q, displayStatus: 'queued'})),
                 ...data.completed.slice(-3).reverse().map(c => ({...c, displayStatus: 'completed'}))
             ];
+
+            clearHistoryBtn.style.display = data.completed.length > 0 ? 'flex' : 'none';
 
             if (allItems.length > 0) {
                 queueStatus.style.display = 'block';
@@ -179,6 +182,11 @@ form.addEventListener('submit', async (e) => {
         submitBtn.disabled = false;
         submitBtn.classList.remove('loading');
     }
+});
+
+clearHistoryBtn.addEventListener('click', async () => {
+    await fetch('/history', { method: 'DELETE' });
+    updateQueueStatus();
 });
 
 clearBtn.addEventListener('click', () => {
