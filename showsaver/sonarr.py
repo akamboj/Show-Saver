@@ -1,4 +1,5 @@
 import requests
+import time
 from env import SONARR_URL, SONARR_API_KEY
 
 
@@ -97,6 +98,31 @@ def rename_series(series_ids):
     return response.json()
 
 
+def wait_for_command(command_id, timeout=30, poll_interval=3):
+    """
+    Poll /api/v3/command/{id} until Sonarr reports a terminal status.
+
+    Args:
+        command_id: The command ID returned by a previous POST to /api/v3/command
+        timeout: Maximum seconds to wait (default 120)
+        poll_interval: Seconds between polls (default 3)
+
+    Returns:
+        Final status string, e.g. 'completed', 'failed', 'aborted'
+    """
+    url = f"{SONARR_URL.rstrip('/')}/api/v3/command/{command_id}"
+    terminal = {'completed', 'failed', 'aborted'}
+    deadline = time.monotonic() + timeout
+    while time.monotonic() < deadline:
+        response = requests.get(url, headers=_get_headers(), timeout=10)
+        response.raise_for_status()
+        status = response.json().get('status', '')
+        if status in terminal:
+            return status
+        time.sleep(poll_interval)
+    return 'timeout'
+
+
 def refresh_and_rescan_series(show_name, override_name=None, do_rename=False):
     """
     Main entry point: find series and trigger rescan.
@@ -118,7 +144,13 @@ def refresh_and_rescan_series(show_name, override_name=None, do_rename=False):
         return False
 
     rescan_ret = rescan_series(series_id)
+    command_id = rescan_ret.get('id')
     print(f"Sonarr: Triggered rescan for series '{show_name}' (ID: {series_id})")
+
+    if command_id and do_rename:
+        final_status = wait_for_command(command_id)
+        print(f"Sonarr: Rescan finished with status '{final_status}' for '{show_name}'")
+
     if do_rename:
         rename_ret = rename_series([series_id])
         print(f"Sonarr: Triggered rename for series '{show_name}' (ID: {series_id})")
