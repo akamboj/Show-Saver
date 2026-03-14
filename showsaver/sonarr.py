@@ -72,7 +72,7 @@ def rescan_series(series_id):
         "name": "RescanSeries",
         "seriesId": series_id
     }
-    response = requests.post(url, headers=_get_headers(), json=payload, timeout=10)
+    response = requests.post(url, headers=_get_headers(), json=payload, timeout=30)
     response.raise_for_status()
     return response.json()
 
@@ -92,7 +92,7 @@ def rename_series(series_ids):
         "name": "RenameSeries",
         "seriesIds": series_ids
     }
-    response = requests.post(url, headers=_get_headers(), json=payload, timeout=10)
+    response = requests.post(url, headers=_get_headers(), json=payload, timeout=30)
     response.raise_for_status()
     return response.json()
 
@@ -117,8 +117,9 @@ def refresh_and_rescan_series(show_name, override_name=None, do_rename=False):
         print(f"Sonarr: Series '{show_name}' not found in library")
         return False
 
-    rescan_series(series_id)
-    if do_rename:
-        rename_series([series_id])
+    rescan_ret = rescan_series(series_id)
     print(f"Sonarr: Triggered rescan for series '{show_name}' (ID: {series_id})")
+    if do_rename:
+        rename_ret = rename_series([series_id])
+        print(f"Sonarr: Triggered rename for series '{show_name}' (ID: {series_id})")
     return True
