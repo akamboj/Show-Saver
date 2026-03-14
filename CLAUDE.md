@@ -69,6 +69,11 @@ Uses `.netrc` file in CONFIG_DIR for site credentials. The netrc_location is pas
 ### Sonarr Integration
 Optional integration that triggers a series rescan in Sonarr after downloading. Configure `SONARR_URL` and `SONARR_API_KEY` to enable. The integration is non-blocking - Sonarr failures are logged as warnings but never cause downloads to fail.
 
+## Code Style
+
+### Imports
+Keep all imports in alphabetical order within each group (standard library, third-party, local).
+
 ## CI/CD
 
 GitHub Actions workflow builds and publishes Docker image to DockerHub (`akamboj2000/show-saver:latest`) on push/PR to main.
