@@ -45,7 +45,13 @@ class DropoutProcessor:
     
 
     def should_trigger_rename(self, info_dict) -> bool:
-        return self.__is_last_look(info_dict)
+
+        series = info_dict.get('series', '')
+        if self.__is_last_look(info_dict):
+            return True
+        if 'Don\'t Hug Me I\'m Scared' in series:
+            return True
+        return False
     
 
     def __is_last_look(self, info_dict) -> bool:
