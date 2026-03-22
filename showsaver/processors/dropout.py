@@ -3,6 +3,7 @@ import time
 import yt_dlp
 from bs4 import BeautifulSoup
 from downloader import BASE_YT_OPTS
+from processors import Processor
 from urllib.parse import urlsplit, urlunsplit
 
 DROPOUT_NEW_RELEASES_URL = "https://watch.dropout.tv/new-releases"
@@ -23,7 +24,7 @@ SHOW_NAME_OVERRIDES = {
     'Don\'t Hug Me I\'m Scared' : 'Don\'t Hug Me I\'m Scared (2022)'
 }
 
-class DropoutProcessor:
+class DropoutProcessor(Processor):
     def process_info_dict(self, info_dict):
 
         if self.__is_last_look(info_dict):
@@ -42,7 +43,7 @@ class DropoutProcessor:
         if show_name in SHOW_NAME_OVERRIDES:
             return SHOW_NAME_OVERRIDES[show_name]
         return show_name
-    
+
 
     def should_trigger_rename(self, info_dict) -> bool:
 
@@ -52,7 +53,7 @@ class DropoutProcessor:
         if 'Don\'t Hug Me I\'m Scared' in series:
             return True
         return False
-    
+
 
     def __is_last_look(self, info_dict) -> bool:
 
@@ -67,7 +68,7 @@ class DropoutProcessor:
 def time_to_sec(t) -> int:
     if not ':' in t:
         return int(t)
-    
+
     split_time = t.split(':')
     if len(split_time) == 3:
         h, m, s = map(int, split_time)
@@ -148,7 +149,7 @@ def _get_new_releases_ytdlp():
         }
 
         videos.append(extracted_data)
-    
+
     return videos
 
 
@@ -160,10 +161,10 @@ def get_new_releases(force_refresh=False):
     # Check cache
     if not force_refresh and _new_releases_cache['data'] and (time.time() - _new_releases_cache['timestamp'] < CACHE_TTL):
         return {'success': True, 'videos': _new_releases_cache['data'], 'cached': True}
-    
+
     try:
         videos = _get_new_releases_bs()
-        
+
         # Update cache
         _new_releases_cache['data'] = videos
         _new_releases_cache['timestamp'] = time.time()

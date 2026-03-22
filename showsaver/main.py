@@ -1,5 +1,5 @@
 import downloader
-import dropout
+from processors import dropout
 
 import logging
 import os
