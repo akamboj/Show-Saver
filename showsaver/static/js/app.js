@@ -9,9 +9,29 @@ const statValue1 = document.getElementById('statValue1');
 const statLabel1 = document.getElementById('statLabel1');
 const statValue2 = document.getElementById('statValue2');
 const statLabel2 = document.getElementById('statLabel2');
-const queueStatus = document.getElementById('queueStatus');
-const queueList = document.getElementById('queueList');
+const panelQueueList = document.getElementById('panelQueueList');
 const clearHistoryBtn = document.getElementById('clearHistoryBtn');
+const activityToggle = document.getElementById('activity-toggle');
+const activityPanel = document.getElementById('activity-panel');
+const activityOverlay = document.getElementById('activity-overlay');
+const activityClose = document.getElementById('activity-close');
+const activityBadge = document.getElementById('activity-badge');
+const progressRingFill = document.getElementById('progress-ring-fill');
+const RING_CIRCUMFERENCE = 106.8;
+
+function openPanel() {
+    activityPanel.classList.add('open');
+    activityOverlay.classList.add('visible');
+}
+
+function closePanel() {
+    activityPanel.classList.remove('open');
+    activityOverlay.classList.remove('visible');
+}
+
+activityToggle.addEventListener('click', () => activityPanel.classList.contains('open') ? closePanel() : openPanel());
+activityClose.addEventListener('click', closePanel);
+activityOverlay.addEventListener('click', closePanel);
 
 let activeJobId = null;
 let statusInterval = null;
@@ -45,28 +65,38 @@ async function updateQueueStatus() {
                 ...data.completed.slice(-3).reverse().map(c => ({...c, displayStatus: 'completed'}))
             ];
 
-            clearHistoryBtn.style.display = data.completed.length > 0 ? 'flex' : 'none';
+            clearHistoryBtn.style.display = data.completed.length > 0 ? 'block' : 'none';
 
-            if (allItems.length > 0) {
-                queueStatus.style.display = 'block';
-                queueList.innerHTML = allItems.map(item => `
-                    <div class="queue-item ${item.displayStatus}">
-                        <div class="queue-item-header">
-                            <div class="queue-item-url" title="${item.url}">${item.url}</div>
-                            <div class="queue-item-status ${item.displayStatus}">${item.status}</div>
-                        </div>
-                        ${item.displayStatus === 'downloading' ? `
-                            <div class="queue-item-step">
-                                Step ${item.step || 1}/${item.total_steps || 1}: ${formatStepType(item.step_type)}
-                            </div>
-                            <div class="queue-item-progress">
-                                <div class="queue-item-progress-bar" style="width: ${item.progress || 0}%"></div>
-                            </div>
-                        ` : ''}
+            panelQueueList.innerHTML = allItems.map(item => `
+                <div class="queue-item ${item.displayStatus}">
+                    <div class="queue-item-header">
+                        <div class="queue-item-url" title="${item.url}">${item.url}</div>
+                        <div class="queue-item-status ${item.displayStatus}">${item.status}</div>
                     </div>
-                `).join('');
+                    ${item.displayStatus === 'downloading' ? `
+                        <div class="queue-item-step">
+                            Step ${item.step || 1}/${item.total_steps || 1}: ${formatStepType(item.step_type)}
+                        </div>
+                        <div class="queue-item-progress">
+                            <div class="queue-item-progress-bar" style="width: ${item.progress || 0}%"></div>
+                        </div>
+                    ` : ''}
+                </div>
+            `).join('');
+
+            const activeCount = data.downloading.length + data.queued.length;
+            if (activeCount > 0) {
+                activityBadge.textContent = activeCount;
+                activityBadge.classList.remove('hidden');
             } else {
-                queueStatus.style.display = 'none';
+                activityBadge.classList.add('hidden');
+            }
+
+            if (data.downloading.length > 0) {
+                const avg = data.downloading.reduce((sum, d) => sum + (d.progress || 0), 0) / data.downloading.length;
+                progressRingFill.style.strokeDashoffset = RING_CIRCUMFERENCE * (1 - avg / 100);
+            } else {
+                progressRingFill.style.strokeDashoffset = RING_CIRCUMFERENCE;
             }
         }
     } catch (error) {
