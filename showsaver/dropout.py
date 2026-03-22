@@ -19,7 +19,8 @@ _episode_cache = {}
 EPISODE_CACHE_TTL = 3600  # 1 hour for individual episodes
 
 SHOW_NAME_OVERRIDES = {
-    'Very Important People' : 'Very Important People (2023)'
+    'Very Important People' : 'Very Important People (2023)',
+    'Don\'t Hug Me I\'m Scared' : 'Don\'t Hug Me I\'m Scared (2022)'
 }
 
 class DropoutProcessor:
