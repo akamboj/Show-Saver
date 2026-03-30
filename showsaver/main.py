@@ -7,6 +7,7 @@ import queue
 import threading
 import time
 import yt_dlp
+import yt_dlp.version
 
 from datetime import datetime
 from env import (
