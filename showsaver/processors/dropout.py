@@ -4,7 +4,6 @@ import yt_dlp
 from bs4 import BeautifulSoup
 from downloader import BASE_YT_OPTS
 from processors import Processor
-from urllib.parse import urlsplit, urlunsplit
 
 DROPOUT_NEW_RELEASES_URL = "https://watch.dropout.tv/new-releases"
 
@@ -92,8 +91,10 @@ def _get_new_releases_bs():
             list_items = soup.find_all('li', class_='js-collection-item')
             for list_item in list_items:
                 if list_item:
-                    thumbnail = list_item.img['src']
+                    img = list_item.find('img')
+                    thumbnail = img['src'] if img else None
                     link = list_item.find('a', href=True)
+
                     title = list_item.find('strong')['title']
                     url = link['href'].replace('/new-releases', '')
                     id = int(list_item['data-item-id'])
