@@ -26,15 +26,30 @@ SHOW_NAME_OVERRIDES = {
 class DropoutProcessor(Processor):
     def process_info_dict(self, info_dict):
 
+        season_number = info_dict.get('season_number', 0)
         if self.__is_last_look(info_dict):
             info_dict['season_number'] = 0
             info_dict['episode_number'] = 0
+        elif self.__is_dim20(info_dict):
+            # Seaon 27 is now On a Bus S1, and 28 is On a Bus S2. We need to decrement season number for each
+            if season_number > 29:
+                info_dict['season_number'] = season_number - 2
+            elif season_number > 27:
+                info_dict['season_number'] = season_number - 1
+        elif self.__is_adventuring_party(info_dict):
+            # Season 23 is On a Bus S2 adventuring party. So we need to decrement to match actual expected season number.
+            if season_number > 23:
+                info_dict['season_number'] = season_number - 1
 
 
     def process_dlp_opts(self, dlp_opts, info_dict):
 
         if self.__is_last_look(info_dict):
             dlp_opts['outtmpl'] = {'default' : '%(series)s - S00E00 - %(title)s WEBDL-1080p.%(ext)s'}
+        elif self.__is_dim20(info_dict) or self.__is_adventuring_party(info_dict):
+            # Because of the season number modification we have to specify it directly in the file name template
+            season_number = info_dict.get('season_number', 0)
+            dlp_opts['outtmpl'] = {'default' : f'%(series)s - S{season_number}E%(episode_number)02d - %(title)s WEBDL-1080p.%(ext)s'}
 
 
     def process_show_name(self, show_name) -> str:
@@ -59,6 +74,22 @@ class DropoutProcessor(Processor):
         series = info_dict.get('series', '')
         title = info_dict.get('title', '')
         if 'Very Important People' in series and 'Last Looks' in title:
+            return True
+        return False
+    
+
+    def __is_dim20(self, info_dict) -> bool:
+
+        series = info_dict.get('series', '')
+        if 'Dimension 20' == series:
+            return True
+        return False
+
+
+    def __is_adventuring_party(self, info_dict) -> bool:
+
+        series = info_dict.get('series', '')
+        if 'Dimension 20\'s Adventuring Party' == series:
             return True
         return False
 
