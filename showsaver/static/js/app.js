@@ -37,6 +37,7 @@ let activeJobId = null;
 let statusInterval = null;
 let connectionLost = false;
 let prevDownloadingIds = new Set();
+let pendingJob = null;
 const connectionToast = document.getElementById('connectionError');
 
 function formatStepType(stepType) {
@@ -65,6 +66,24 @@ async function updateQueueStatus() {
                 ...data.queued.map(q => ({...q, displayStatus: 'queued'})),
                 ...data.completed.slice(-3).reverse().map(c => ({...c, displayStatus: 'completed'}))
             ];
+
+            if (pendingJob) {
+                if (pendingJob.id === null) {
+                    // Still waiting for server response — always show pending
+                    allItems.unshift({ ...pendingJob, displayStatus: 'pending', status: 'pending' });
+                } else {
+                    const knownIds = new Set([
+                        ...data.downloading.map(d => d.id),
+                        ...data.queued.map(q => q.id),
+                        ...data.completed.map(c => c.id)
+                    ]);
+                    if (knownIds.has(pendingJob.id)) {
+                        pendingJob = null;
+                    } else {
+                        allItems.unshift({ ...pendingJob, displayStatus: 'pending', status: 'pending' });
+                    }
+                }
+            }
 
             clearHistoryBtn.style.display = data.completed.length > 0 ? 'block' : 'none';
 
@@ -172,6 +191,10 @@ form.addEventListener('submit', async (e) => {
     submitBtn.disabled = true;
     submitBtn.classList.add('loading');
 
+    // Open panel immediately with a pending entry before the server responds
+    pendingJob = { id: null, url: text };
+    openPanel();
+
     try {
         const response = await fetch('/submit', {
             method: 'POST',
@@ -201,9 +224,13 @@ form.addEventListener('submit', async (e) => {
             if (statusInterval) clearInterval(statusInterval);
             statusInterval = setInterval(() => pollJobStatus(activeJobId), 1000);
 
+            // Update pending entry with real job ID
+            pendingJob = { id: data.job_id, url: text };
+
             // Clear input
             textInput.value = '';
         } else {
+            pendingJob = null;
             responseDiv.className = 'response show error';
             responseTitle.textContent = '✗ Error';
             responseText.textContent = data.message;
@@ -211,6 +238,7 @@ form.addEventListener('submit', async (e) => {
         }
 
     } catch (error) {
+        pendingJob = null;
         responseDiv.className = 'response show error';
         responseTitle.textContent = '✗ Error';
         responseText.textContent = 'Failed to connect to the server. Please try again.';

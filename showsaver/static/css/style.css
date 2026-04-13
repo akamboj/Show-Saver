@@ -624,6 +624,10 @@ button {
     border-left-color: #FF5252;
 }
 
+.queue-item.pending {
+    border-left-color: #3b82f6;
+}
+
 .queue-item-header {
     display: flex;
     flex-direction: column;
@@ -664,6 +668,10 @@ button {
 
 .queue-item-status.failed {
     background: #FF5252;
+}
+
+.queue-item-status.pending {
+    background: #3b82f6;
 }
 
 .queue-item-progress {
