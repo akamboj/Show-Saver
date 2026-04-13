@@ -36,6 +36,7 @@ activityOverlay.addEventListener('click', closePanel);
 let activeJobId = null;
 let statusInterval = null;
 let connectionLost = false;
+let prevDownloadingIds = new Set();
 const connectionToast = document.getElementById('connectionError');
 
 function formatStepType(stepType) {
@@ -98,6 +99,12 @@ async function updateQueueStatus() {
             } else {
                 progressRingFill.style.strokeDashoffset = RING_CIRCUMFERENCE;
             }
+
+            const currentIds = new Set(data.downloading.map(d => d.id));
+            if ([...currentIds].some(id => !prevDownloadingIds.has(id))) {
+                openPanel();
+            }
+            prevDownloadingIds = currentIds;
         }
     } catch (error) {
         console.error('Failed to update queue status:', error);
