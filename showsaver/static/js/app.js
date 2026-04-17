@@ -265,8 +265,8 @@ clearBtn.addEventListener('click', () => {
     textInput.focus();
 });
 
-// Update queue status every 2 seconds
-setInterval(updateQueueStatus, 2000);
+// Update queue status every 1 second
+setInterval(updateQueueStatus, 1000);
 updateQueueStatus(); // Initial load
 
 // Add subtle interaction feedback
