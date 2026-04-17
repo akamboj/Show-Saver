@@ -36,13 +36,17 @@ class DropoutProcessor(Processor):
                 info_dict['season_number'] = season_number - 2
             elif season_number > 27:
                 info_dict['season_number'] = season_number - 1
+        elif self.__is_adventuring_party(info_dict):
+            # Season 23 is On a Bus S2 adventuring party. So we need to decrement to match actual expected season number.
+            if season_number > 23:
+                info_dict['season_number'] = season_number - 1
 
 
     def process_dlp_opts(self, dlp_opts, info_dict):
 
         if self.__is_last_look(info_dict):
             dlp_opts['outtmpl'] = {'default' : '%(series)s - S00E00 - %(title)s WEBDL-1080p.%(ext)s'}
-        elif self.__is_dim20(info_dict):
+        elif self.__is_dim20(info_dict) or self.__is_adventuring_party(info_dict):
             # Because of the season number modification we have to specify it directly in the file name template
             season_number = info_dict.get('season_number', 0)
             dlp_opts['outtmpl'] = {'default' : f'%(series)s - S{season_number}E%(episode_number)02d - %(title)s WEBDL-1080p.%(ext)s'}
