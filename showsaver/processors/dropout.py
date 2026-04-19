@@ -1,9 +1,13 @@
+import database
+from downloader import BASE_YT_OPTS
+from processors import Processor
+
 import requests
 import time
 import yt_dlp
 from bs4 import BeautifulSoup
-from downloader import BASE_YT_OPTS
-from processors import Processor
+from typing import Any
+from urllib.parse import urlparse
 
 DROPOUT_NEW_RELEASES_URL = "https://watch.dropout.tv/new-releases"
 
@@ -108,7 +112,7 @@ def _time_to_sec(t: str) -> int:
         return m * 60 + s
 
 
-def _get_new_releases_bs():
+def _get_new_releases_bs() -> list[dict[str, Any]] | None:
     """
     Use BeautifulSoup to parse webpage to fetch new releases.
     """
@@ -153,7 +157,27 @@ def _get_new_releases_bs():
         print(f"Failed to retrieve the page. Status code: {response.status_code}")
 
 
-def get_new_releases(force_refresh=False):
+def _get_url_path(url: str) -> str:
+    parsed_url = urlparse(url)
+    split_path = parsed_url.path.split('/')
+    return split_path[-1]
+
+
+def _update_database_episode(video_info: dict) -> None:
+    full_url = video_info.get('url', '')
+    url_path = _get_url_path(full_url)
+
+    database.upsert_dropout_episode(
+        url_path=url_path,
+        full_url=full_url,
+        show_name=video_info.get('show_name', ''),
+        episode_title=video_info.get('title', ''),
+        thumbnail_url=video_info.get('thumbnail', ''),
+        duration_secs=video_info.get('duration', -1)
+    )
+
+
+def get_new_releases(force_refresh: bool=False):
     """
     Get list of new releases from Dropout using yt-dlp.
     Returns dict with 'success', 'videos' list, 'cached' flag.
@@ -164,6 +188,9 @@ def get_new_releases(force_refresh=False):
 
     try:
         videos = _get_new_releases_bs()
+        if videos:
+            for video in videos:
+                _update_database_episode(video)
 
         # Update cache
         _new_releases_cache['data'] = videos
@@ -181,6 +208,10 @@ def get_epsiode_info(episode_url: str):
     Returns dict with 'success', 'info' dict.
     """
     # Check cache
+    entry = database.get_dropout_episode(_get_url_path(episode_url))
+    if entry and time.time() - entry['timestamp'] < EPISODE_CACHE_TTL:
+        return {'success': True, 'info': entry}
+
     if episode_url in _episode_cache:
         cached = _episode_cache[episode_url]
         if time.time() - cached['timestamp'] < EPISODE_CACHE_TTL:

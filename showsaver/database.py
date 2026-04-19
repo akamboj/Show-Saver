@@ -18,22 +18,26 @@ def init_db() -> None:
                      full_url       TEXT NOT NULL,
                      show_name      TEXT NOT NULL,
                      episode_title  TEXT NOT NULL,
+                     thumbnail_url  TEXT NOT NULL,
+                     duration_secs  INTEGER NOT NULL,
                      fetched_at     REAL NOT NULL   -- unix timestamp
             )
         """)
 
 
-def upsert_dropout_episode(url_path: str, full_url: str, show_name: str, episode_title: str) -> None:
+def upsert_dropout_episode(url_path: str, full_url: str, show_name: str, episode_title: str, thumbnail_url: str, duration_secs: int) -> None:
     with get_connection() as conn:
         conn.execute("""
-            INSERT INTO dropout_episodes (url_path, full_url, show_name, episode_title, fetched_at)
-            VALUES (?, ?, ?, ?, ?)
+            INSERT INTO dropout_episodes (url_path, full_url, show_name, episode_title, thumbnail_url, duration_secs, fetched_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
             ON CONFLICT(url_path) DO UPDATE SET
-                full_url = excluded.full_url
+                full_url = excluded.full_url,
                 show_name = excluded.show_name,
                 episode_title = excluded.episode_title,
+                thumbnail_url = excluded.thumbnail_url,
+                duration_secs = excluded.duration_secs,
                 fetched_at = excluded.fetched_at
-        """, (url_path, full_url, show_name, episode_title, time.time()))
+        """, (url_path, full_url, show_name, episode_title, thumbnail_url, duration_secs, time.time()))
 
 
 def get_dropout_episode(url_path: str) -> dict | None:
@@ -46,5 +50,5 @@ def get_dropout_episode(url_path: str) -> dict | None:
 
 def get_all_dropout_episodes() -> list[dict]:
     with get_connection() as conn:
-        rows = conn.execute("SLECT * FROM dropout_episodes").fetchall()
+        rows = conn.execute("SELECT * FROM dropout_episodes").fetchall()
     return [dict(r) for r in rows]
