@@ -1,4 +1,4 @@
-from flask import Blueprint, jsonify, request, render_template
+from flask import Blueprint, jsonify, redirect, request, render_template, url_for
 from state import download_history, download_status, thread_lock, queue_url
 from version import __version__
 
@@ -8,6 +8,11 @@ bp = Blueprint('downloads', __name__)
 @bp.route('/')
 def home():
     return render_template('index.html', version=__version__)
+
+
+@bp.route('/favicon.ico')
+def favicon():
+    return redirect(url_for('static', filename='favicon.svg'))
 
 
 @bp.route('/submit', methods=['POST'])
