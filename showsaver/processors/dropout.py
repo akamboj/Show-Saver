@@ -95,7 +95,7 @@ class DropoutProcessor(Processor):
 
 
 
-def time_to_sec(t) -> int:
+def _time_to_sec(t: str) -> int:
     if not ':' in t:
         return int(t)
 
@@ -133,7 +133,7 @@ def _get_new_releases_bs():
                     duration_container = list_item.find('div', class_='duration-container')
                     if duration_container:
                         duration_txt = duration_container.text.strip()
-                        duration = time_to_sec(duration_txt)
+                        duration = _time_to_sec(duration_txt)
 
                         extracted_data = {
                             'title': title,
@@ -151,38 +151,6 @@ def _get_new_releases_bs():
             return None
     else:
         print(f"Failed to retrieve the page. Status code: {response.status_code}")
-
-
-def _get_new_releases_ytdlp():
-    """
-    Use yt-dlp to fetch new release info.
-    """
-    opts = {
-        **BASE_YT_OPTS,
-        'extract_flat': 'in_playlist',  # Get metadata without downloading
-        'list_thumbnails': True,
-        'skip_download': True,
-        'quiet': True,
-    }
-    with yt_dlp.YoutubeDL(opts) as ydl:
-        info = ydl.extract_info(DROPOUT_NEW_RELEASES_URL, download=False)
-
-    videos = []
-    for entry in info.get('entries', []):
-        url = entry.get('url') or entry.get('webpage_url')
-        url = url.replace('/new-releases', '')
-
-        extracted_data = {
-            'title': entry.get('title'),
-            'url': url,
-            'thumbnail': entry.get('thumbnail'),
-            'duration': entry.get('duration'),  # seconds
-            'id': entry.get('id'),
-        }
-
-        videos.append(extracted_data)
-
-    return videos
 
 
 def get_new_releases(force_refresh=False):
@@ -207,7 +175,7 @@ def get_new_releases(force_refresh=False):
         return {'success': False, 'error': str(e), 'videos': []}
 
 
-def get_epsiode_info(episode_url):
+def get_epsiode_info(episode_url: str):
     """
     Get detailed info for a single episode URL.
     Returns dict with 'success', 'info' dict.
