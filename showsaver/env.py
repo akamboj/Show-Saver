@@ -33,6 +33,12 @@ URL = os.getenv("SHOW_URL", "")
 DO_CLEANUP = string_to_bool(os.getenv("AUTO_CLEANUP_TMP", "true"))
 
 #
+# Database
+#
+
+DB_PATH = CONFIG_DIR / "showsaver.db"
+
+#
 # Sonarr Integration (optional)
 #
 

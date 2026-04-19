@@ -1,3 +1,4 @@
+import database
 import downloader
 from processors import dropout
 
@@ -118,6 +119,7 @@ def create_config_files():
 def _initialize():
     """Initialize app - runs on module load for gunicorn compatibility."""
     try:
+        database.init_db()
         create_config_files()
 
         print("yt-dlp version: " + yt_dlp.version.__version__)
