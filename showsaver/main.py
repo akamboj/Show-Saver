@@ -18,7 +18,10 @@ from flask import Flask
 from routes.downloads import bp as downloads_bp
 from routes.dropout import bp as dropout_bp
 from sonarr import is_sonarr_enabled
-from state import download_queue, download_status, download_history, thread_lock, queue_url
+from state import (
+    download_queue, download_status, download_history, thread_lock, queue_url,
+    metadata_queue, metadata_in_flight
+)
 
 # Enable remote debugging when debugging is enabled
 if DEBUG:
@@ -47,7 +50,7 @@ class _NoQueueFilter(logging.Filter):
 logging.getLogger('werkzeug').addFilter(_NoQueueFilter())
 
 
-def download_worker():
+def download_worker() -> None:
     """Background worker that processes download queue"""
     print('Download thread started.')
     while True:
@@ -93,6 +96,28 @@ def download_worker():
             continue
 
 
+def metadata_worker() -> None:
+    """Background worker that fills in episode metadata via yt-dlp."""
+    print('Metadata thread started')
+    while True:
+        try:
+            episode_url_data = metadata_queue.get(timeout=1)
+        except queue.Empty:
+            continue
+
+        url_path = episode_url_data['url_path']
+        full_url = episode_url_data['url']
+        try:
+            dropout.fetch_and_store_episode_info(full_url)
+        except Exception as e:
+            print(f'Metadata fetch failed for {full_url}: {e}')
+        finally:
+            if url_path is not None:
+                with thread_lock:
+                    metadata_in_flight.discard(url_path)
+            metadata_queue.task_done()
+
+
 def get_urls_to_process() -> list[str]:
     urls = []
     if URL:
@@ -133,6 +158,8 @@ def _initialize():
 
         download_thread = threading.Thread(target=download_worker, daemon=True)
         download_thread.start()
+        metadata_thread = threading.Thread(target=metadata_worker, daemon=True)
+        metadata_thread.start()
     except Exception as e:
         print(f"Initialization error: {e}")
         import traceback

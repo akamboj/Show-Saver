@@ -20,7 +20,7 @@ CACHE_TTL = 300  # 5 minutes
 
 # Episode info cache (keyed by URL)
 _episode_cache = {}
-EPISODE_CACHE_TTL = 3600  # 1 hour for individual episodes
+_EPISODE_CACHE_TTL = 3600  # 1 hour for individual episodes
 
 SHOW_NAME_OVERRIDES = {
     'Very Important People' : 'Very Important People (2023)',
@@ -28,7 +28,7 @@ SHOW_NAME_OVERRIDES = {
 }
 
 class DropoutProcessor(Processor):
-    def process_info_dict(self, info_dict):
+    def process_info_dict(self, info_dict) -> None:
 
         season_number = info_dict.get('season_number', 0)
         if self.__is_last_look(info_dict):
@@ -46,7 +46,7 @@ class DropoutProcessor(Processor):
                 info_dict['season_number'] = season_number - 1
 
 
-    def process_dlp_opts(self, dlp_opts, info_dict):
+    def process_dlp_opts(self, dlp_opts, info_dict) -> None:
 
         if self.__is_last_look(info_dict):
             dlp_opts['outtmpl'] = {'default' : '%(series)s - S00E00 - %(title)s WEBDL-1080p.%(ext)s'}
@@ -56,7 +56,7 @@ class DropoutProcessor(Processor):
             dlp_opts['outtmpl'] = {'default' : f'%(series)s - S{season_number}E%(episode_number)02d - %(title)s WEBDL-1080p.%(ext)s'}
 
 
-    def process_show_name(self, show_name) -> str:
+    def process_show_name(self, show_name: str) -> str:
 
         if show_name in SHOW_NAME_OVERRIDES:
             return SHOW_NAME_OVERRIDES[show_name]
@@ -169,10 +169,10 @@ def _update_database_episode(video_info: dict) -> None:
 
     database.upsert_dropout_episode(
         url_path=url_path,
-        full_url=full_url,
+        url=full_url,
         show_name=video_info.get('show_name', ''),
         episode_title=video_info.get('title', ''),
-        thumbnail_url=video_info.get('thumbnail', ''),
+        thumbnail=video_info.get('thumbnail', ''),
         duration_secs=video_info.get('duration', -1)
     )
 
@@ -182,67 +182,76 @@ def get_new_releases(force_refresh: bool=False):
     Get list of new releases from Dropout using yt-dlp.
     Returns dict with 'success', 'videos' list, 'cached' flag.
     """
-    # Check cache
+    from state import queue_metadata
+
+    
     if not force_refresh and _new_releases_cache['data'] and (time.time() - _new_releases_cache['timestamp'] < CACHE_TTL):
-        return {'success': True, 'videos': _new_releases_cache['data'], 'cached': True}
-
+        fetched = [database.get_dropout_episode(_get_url_path(url)) for url in _new_releases_cache['data']]
+        return {'success': True, 'videos': fetched, 'cached': True}
+    
     try:
-        videos = _get_new_releases_bs()
-        if videos:
-            for video in videos:
-                _update_database_episode(video)
+        scraped = _get_new_releases_bs() or []
+        videos = []
+        for v in scraped:
+            url_path = _get_url_path(v['url'])
+            # Preserve any existing show_name in data
+            database.upsert_dropout_episode_basic(
+                url_path=url_path,
+                url=v['url'],
+                episode_title=v.get('title', ''),
+                thumbnail=v.get('thumbnail', ''),
+                duration_secs=v.get('duration', -1),
+            )
+            row = database.get_dropout_episode(url_path) or {}
+            merged = {
+                **v,
+                'show_name': row.get('show_name', ''),
+            }
+            videos.append(merged)
 
-        # Update cache
-        _new_releases_cache['data'] = videos
+            if not merged['show_name']:
+                queue_metadata(v['url'], url_path)
+        
+
+        _new_releases_cache['data'] = [v['url'] for v in videos if v]
         _new_releases_cache['timestamp'] = time.time()
-
         return {'success': True, 'videos': videos, 'cached': False}
-
+    
     except Exception as e:
         return {'success': False, 'error': str(e), 'videos': []}
 
 
-def get_epsiode_info(episode_url: str):
-    """
-    Get detailed info for a single episode URL.
-    Returns dict with 'success', 'info' dict.
-    """
-    # Check cache
-    entry = database.get_dropout_episode(_get_url_path(episode_url))
-    if entry and time.time() - entry['timestamp'] < EPISODE_CACHE_TTL:
-        return {'success': True, 'info': entry}
-
-    if episode_url in _episode_cache:
-        cached = _episode_cache[episode_url]
-        if time.time() - cached['timestamp'] < EPISODE_CACHE_TTL:
-            return {'success': True, 'info': cached['data']}
-
+def fetch_and_store_episode_info(episode_url: str) -> dict[str, Any]:
+    # Run yt-dlp, upsert the full row to DB. Returns the info dict or raises.
     opts = {
         **BASE_YT_OPTS,
         'skip_download': True,
         'quiet': True,
     }
+    with yt_dlp.YoutubeDL(opts) as ydl:
+        info = ydl.extract_info(episode_url, download=False)
+    
+    episode_info = {
+        'title': info.get('title'),
+        'url': info.get('webpage_url'),
+        'thumbnail': info.get('thumbnail'),
+        'duration': info.get('duration'),
+        'description': info.get('description'),
+        'id': info.get('id'),
+        'show_name': info.get('series', ' '),
+    }
+    _update_database_episode(episode_info)
+    return episode_info
+    
 
+
+def get_epsiode_info(episode_url: str):
+    """DB-only read. Background worker is responsible for populating rows."""
     try:
-        with yt_dlp.YoutubeDL(opts) as ydl:
-            info = ydl.extract_info(episode_url, download=False)
-
-        episode_info = {
-            'title': info.get('title'),
-            'url': info.get('webpage_url'),
-            'thumbnail': info.get('thumbnail'),
-            'duration': info.get('duration'),
-            'description': info.get('description'),
-            'id': info.get('id'),
-        }
-
-        # Update cache
-        _episode_cache[episode_url] = {
-            'data': episode_info,
-            'timestamp': time.time()
-        }
-
-        return {'success': True, 'info': episode_info}
-
+        url_path = _get_url_path(episode_url)
+        entry = database.get_dropout_episode(url_path)
+        if entry:
+            return {'success': True, 'info': entry}
+        return {'success': False, 'error': 'not_yet_fetched', 'info': None}
     except Exception as e:
         return {'success': False, 'error': str(e), 'info': None}

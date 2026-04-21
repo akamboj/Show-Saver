@@ -8,6 +8,10 @@ from typing import Any
 download_queue: queue.Queue = queue.Queue()
 download_status: dict[str, Any] = {}
 download_history: list[dict] = []
+
+metadata_queue: queue.Queue = queue.Queue()
+metadata_in_flight: set[str] = set()   # keyed by url_path; guarded by thread_lock
+
 thread_lock = threading.Lock()
 
 
@@ -41,3 +45,10 @@ def queue_url(url: str) -> str:
 
     download_queue.put({'id': job_id, 'url': url})
     return job_id
+
+
+def queue_metadata(url: str, url_path: str):
+    with thread_lock:
+        if url_path not in metadata_in_flight:
+            metadata_in_flight.add(url_path)
+            metadata_queue.put({'url_path': url_path, 'url': url})

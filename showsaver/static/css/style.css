@@ -895,6 +895,15 @@ button {
     padding: 0.75rem 1rem;
 }
 
+.release-show {
+    font-size: 0.75rem;
+    color: var(--text-muted, #888);
+    margin-bottom: 0.25rem;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
 .release-title {
     font-size: 0.875rem;
     font-weight: 500;
