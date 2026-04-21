@@ -31,6 +31,8 @@ def episode_info():
 
     if result['success']:
         return jsonify({'success': True, 'info': result['info']})
+    if result.get('error') == 'not_yet_fetched':
+        return jsonify({'success': False, 'message': result.get('error'), 'info': None}), 200
     return jsonify({
         'success': False,
         'message': result.get('error', 'Failed to fetch episode info'),
