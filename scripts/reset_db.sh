@@ -1,0 +1,1 @@
+rm -f ./.local/db/showsaver.db
