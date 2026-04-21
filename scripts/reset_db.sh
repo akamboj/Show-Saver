@@ -1,1 +1,1 @@
-rm -f ./.local/db/showsaver.db
+rm -f ./.local/config/showsaver.db
