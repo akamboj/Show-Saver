@@ -180,9 +180,8 @@ def get_new_releases(force_refresh: bool=False):
     Get list of new releases from Dropout using yt-dlp.
     Returns dict with 'success', 'videos' list, 'cached' flag.
     """
-    
     if not force_refresh and _new_releases_cache['data'] and (time.time() - _new_releases_cache['timestamp'] < CACHE_TTL):
-        fetched = [database.get_dropout_episode(_get_url_path(url)) for url in _new_releases_cache['data']]
+        fetched = [row for row in (database.get_dropout_episode(_get_url_path(u)) for u in _new_releases_cache['data']) if row]
         if fetched:
             return {'success': True, 'videos': fetched, 'cached': True}
     
@@ -209,11 +208,9 @@ def get_new_releases(force_refresh: bool=False):
             if not merged['show_name']:
                 queue_metadata(v['url'], url_path)
         
-
         _new_releases_cache['data'] = [v['url'] for v in videos if v]
         _new_releases_cache['timestamp'] = time.time()
         return {'success': True, 'videos': videos, 'cached': False}
-    
     except Exception as e:
         return {'success': False, 'error': str(e), 'videos': []}
 
@@ -235,7 +232,7 @@ def fetch_and_store_episode_info(episode_url: str) -> dict[str, Any]:
         'duration': info.get('duration'),
         'description': info.get('description'),
         'id': info.get('id'),
-        'show_name': info.get('series', ' '),
+        'show_name': info.get('series', ''),
     }
     _update_database_episode(episode_info)
     return episode_info
