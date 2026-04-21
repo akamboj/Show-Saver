@@ -109,6 +109,7 @@ def metadata_worker() -> None:
         full_url = episode_url_data['url']
         try:
             dropout.fetch_and_store_episode_info(full_url)
+            print(f'Metadata fetch succeeded for {full_url}')
         except Exception as e:
             print(f'Metadata fetch failed for {full_url}: {e}')
         finally:
