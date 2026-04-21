@@ -1,6 +1,7 @@
 import database
 from downloader import BASE_YT_OPTS
 from processors import Processor
+from state import queue_metadata
 
 import requests
 import time
@@ -11,16 +12,12 @@ from urllib.parse import urlparse
 
 DROPOUT_NEW_RELEASES_URL = "https://watch.dropout.tv/new-releases"
 
-# Simple in-memory cache
+# Cache for new releases found on last scrape
 _new_releases_cache = {
     'data': None,
     'timestamp': 0
 }
 CACHE_TTL = 300  # 5 minutes
-
-# Episode info cache (keyed by URL)
-_episode_cache = {}
-_EPISODE_CACHE_TTL = 3600  # 1 hour for individual episodes
 
 SHOW_NAME_OVERRIDES = {
     'Very Important People' : 'Very Important People (2023)',
@@ -159,7 +156,8 @@ def _get_new_releases_bs() -> list[dict[str, Any]] | None:
 
 def _get_url_path(url: str) -> str:
     parsed_url = urlparse(url)
-    split_path = parsed_url.path.split('/')
+    stripped_path = parsed_url.path.rstrip('/')
+    split_path = stripped_path.split('/')
     return split_path[-1]
 
 
@@ -182,12 +180,11 @@ def get_new_releases(force_refresh: bool=False):
     Get list of new releases from Dropout using yt-dlp.
     Returns dict with 'success', 'videos' list, 'cached' flag.
     """
-    from state import queue_metadata
-
     
     if not force_refresh and _new_releases_cache['data'] and (time.time() - _new_releases_cache['timestamp'] < CACHE_TTL):
         fetched = [database.get_dropout_episode(_get_url_path(url)) for url in _new_releases_cache['data']]
-        return {'success': True, 'videos': fetched, 'cached': True}
+        if fetched:
+            return {'success': True, 'videos': fetched, 'cached': True}
     
     try:
         scraped = _get_new_releases_bs() or []
@@ -243,7 +240,6 @@ def fetch_and_store_episode_info(episode_url: str) -> dict[str, Any]:
     _update_database_episode(episode_info)
     return episode_info
     
-
 
 def get_epsiode_info(episode_url: str):
     """DB-only read. Background worker is responsible for populating rows."""
