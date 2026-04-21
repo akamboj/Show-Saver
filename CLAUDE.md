@@ -33,9 +33,10 @@ The Flask app runs on http://localhost:5000.
 
 ```
 Flask Web Server (main.py)
-├── Routes: /, /submit, /status/<job_id>, /queue, /history
+├── Routes: /, /favicon.ico, /submit, /status/<job_id>, /queue, /history
 │            /dropout/new-releases, /dropout/info
-└── Background download_worker thread → processes queue via downloader.process_url()
+├── Background download_worker thread → processes queue via downloader.process_url()
+└── Background metadata_worker thread → fills Dropout episode metadata via yt-dlp
 
 downloader.py
 ├── get_metadata()         → extracts show info via yt-dlp
@@ -46,13 +47,26 @@ downloader.py
 sonarr.py
 └── Sonarr API client: rescan, rename, wait for command completion
 
-dropout.py
-├── DropoutProcessor       → custom processor for Dropout content (show name overrides, specials handling)
-├── get_new_releases()     → scrapes Dropout new releases with 5-minute caching
-└── get_epsiode_info()     → fetches episode metadata with 1-hour caching
+database.py
+├── init_db()                        → creates table + enables WAL / busy_timeout
+├── upsert_dropout_episode()         → full row upsert (used by metadata worker)
+├── upsert_dropout_episode_basic()   → scrape-time upsert that preserves show_name
+├── get_dropout_episode(url_path)    → single-row read
+└── get_all_dropout_episodes()       → full-table read
+
+processors/dropout.py
+├── DropoutProcessor              → custom processor for Dropout content (show name overrides, specials handling)
+├── get_new_releases()            → scrapes Dropout releases, merges with DB, queues worker for rows missing show_name
+├── fetch_and_store_episode_info() → yt-dlp fetch + DB upsert (called by metadata worker)
+└── get_epsiode_info()            → DB-only read (worker populates rows asynchronously)
+
+state.py
+├── download_queue / download_status / download_history
+├── metadata_queue / metadata_in_flight   → dedup'd queue for metadata worker
+└── queue_metadata(url, url_path)         → thread-safe enqueue
 
 env.py
-└── Environment configuration (CONFIG_DIR, SHOW_DIR, TMP_DIR, etc.)
+└── Environment configuration (CONFIG_DIR, SHOW_DIR, TMP_DIR, DB_PATH, etc.)
 ```
 
 ### Download Flow
@@ -71,18 +85,30 @@ env.py
 `%(series)s - S%(season_number)02dE%(episode_number)02d - %(title)s WEBDL-1080p.%(ext)s`
 
 ### Processor Pattern
-Processors customize download behavior per content source. `DropoutProcessor` (in `dropout.py`) is the current implementation:
+Processors customize download behavior per content source. `DropoutProcessor` (in `processors/dropout.py`) is the current implementation:
 - `process_info_dict()` — marks "Last Looks" episodes as S00E00 (Specials)
 - `process_dlp_opts()` — customizes output template for special episodes
 - `process_show_name()` — applies show name overrides (e.g., `'Very Important People'` → `'Very Important People (2023)'`)
 - `should_trigger_rename()` — returns `True` for episodes that need Sonarr rename
 
+### Metadata Caching
+Episode metadata for Dropout releases is cached in SQLite at `DB_PATH` (default `{CONFIG_DIR}/showsaver.db`).
+
+- **Table:** `dropout_episodes(url_path PK, url, show_name, title, thumbnail, duration, fetched_at)`
+- **Scrape path:** `/dropout/new-releases` triggers `get_new_releases()`, which scrapes the public HTML, upserts scrape-time fields via `upsert_dropout_episode_basic()` (preserves any existing `show_name`), and enqueues a background `metadata_worker` job for any row still missing `show_name`.
+- **Worker:** `metadata_worker` (started in `main.py`) runs yt-dlp per URL and calls `upsert_dropout_episode()` with the full row. `metadata_in_flight` (guarded by `thread_lock`) dedups concurrent enqueues.
+- **Frontend polling:** `app.js` polls `/dropout/new-releases` every 2 s (up to 30 polls) until every card has a `show_name`.
+- **Concurrency:** WAL journal mode + `busy_timeout=5000` are set in `init_db()` so the download worker, metadata worker, and request threads can write concurrently.
+- **In-memory scrape cache:** `_new_releases_cache` holds a URL list with a 5-minute TTL to avoid re-scraping on every poll; the DB is the source of truth for metadata.
+- **Reset:** `bash scripts/reset_db.sh` deletes the local dev DB (`./.local/config/showsaver.db`).
+
 ### Environment Variables
 | Variable | Default | Description |
 |----------|---------|-------------|
-| CONFIG_DIR | /config | Stores urls.txt and .netrc for auth |
+| CONFIG_DIR | /config | Stores urls.txt, .netrc for auth, and showsaver.db |
 | SHOW_DIR | /tvshows | Final destination for organized episodes |
 | TMP_DIR | /temp_dir | Temporary download directory |
+| DB_PATH | {CONFIG_DIR}/showsaver.db | SQLite file for Dropout episode cache (derived, not overridable) |
 | SHOW_URL | (empty) | Single URL to queue on startup |
 | AUTO_CLEANUP_TMP | true | Delete temp files after processing |
 | FLASK_PORT | 5000 | Flask server port |
