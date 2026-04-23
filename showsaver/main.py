@@ -48,7 +48,7 @@ app.config['API_VERSION'] = __version__
 app.config['OPENAPI_VERSION'] = '3.0.3'
 app.config['OPENAPI_URL_PREFIX'] = '/docs'
 app.config['OPENAPI_SWAGGER_UI_PATH'] = '/swagger'
-app.config['OPENAPI_SWAGGER_UI_URL'] = 'https://cdn.jsdelivr.net/npm/swagger-ui-dist/'
+app.config['OPENAPI_SWAGGER_UI_URL'] = 'https://cdn.jsdelivr.net/npm/swagger-ui-dist@5.32.4/'
 
 api = Api(app)
 api.register_blueprint(downloads_bp)
