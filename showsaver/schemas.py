@@ -1,11 +1,6 @@
 from marshmallow import Schema, fields
 
 
-class ErrorSchema(Schema):
-    success = fields.Boolean()
-    message = fields.String()
-
-
 # --- /submit ---
 class SubmitRequestSchema(Schema):
     text = fields.String(required=True, metadata={'description': 'URL to download'})

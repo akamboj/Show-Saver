@@ -2,7 +2,7 @@ from flask_smorest import Blueprint, abort
 
 from processors import dropout
 from schemas import (
-    EpisodeInfoQuerySchema, EpisodeInfoResponseSchema, ErrorSchema,
+    EpisodeInfoQuerySchema, EpisodeInfoResponseSchema,
     NewReleasesQuerySchema, NewReleasesResponseSchema
 )
 
@@ -12,7 +12,7 @@ bp = Blueprint('dropout', __name__, url_prefix='/dropout', description='Dropout 
 @bp.route('/new-releases', methods=['GET'])
 @bp.arguments(NewReleasesQuerySchema, location='query')
 @bp.response(200, NewReleasesResponseSchema)
-@bp.alt_response(503, schema=ErrorSchema)
+@bp.alt_response(503)
 def new_releases(query_args):
     force_refresh = query_args.get('refresh', False)
     result = dropout.get_new_releases(force_refresh=force_refresh)
@@ -30,7 +30,7 @@ def new_releases(query_args):
 @bp.route('/info', methods=['GET'])
 @bp.arguments(EpisodeInfoQuerySchema, location='query')
 @bp.response(200, EpisodeInfoResponseSchema)
-@bp.alt_response(503, schema=ErrorSchema)
+@bp.alt_response(503)
 def episode_info(query_args):
     episode_url = query_args.get('episode', '')
     result = dropout.get_epsiode_info(episode_url)

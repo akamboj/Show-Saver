@@ -2,7 +2,7 @@ from flask import redirect, render_template, url_for
 from flask_smorest import Blueprint, abort
 
 from schemas import (
-    ErrorSchema, HistoryResponseSchema,
+    HistoryResponseSchema,
     QueueResponseSchema, StatusResponseSchema,
     SubmitRequestSchema, SubmitResponseSchema,
 )
@@ -25,7 +25,7 @@ def favicon():
 @bp.route('/submit', methods=['POST'])
 @bp.arguments(SubmitRequestSchema)
 @bp.response(200, SubmitResponseSchema)
-@bp.alt_response(422, schema=ErrorSchema)
+@bp.alt_response(422)
 def submit(payload):
     url = payload['text'].strip()
 
@@ -47,7 +47,7 @@ def submit(payload):
 
 @bp.route('/status/<job_id>', methods=['GET'])
 @bp.response(200, StatusResponseSchema)
-@bp.alt_response(404, schema=ErrorSchema)
+@bp.alt_response(404)
 def get_status(job_id):
     with thread_lock:
         if job_id in download_status:
