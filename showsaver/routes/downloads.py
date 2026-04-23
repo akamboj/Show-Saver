@@ -1,8 +1,15 @@
-from flask import Blueprint, jsonify, redirect, request, render_template, url_for
+from flask import redirect, render_template, url_for
+from flask_smorest import Blueprint, abort
+
+from schemas import (
+    ErrorSchema, HistoryResponseSchema,
+    QueueResponseSchema, StatusResponseSchema,
+    SubmitRequestSchema, SubmitResponseSchema,
+)
 from state import download_history, download_status, thread_lock, queue_url
 from version import __version__
 
-bp = Blueprint('downloads', __name__)
+bp = Blueprint('downloads', __name__, description='Download queue operations')
 
 
 @bp.route('/')
@@ -16,56 +23,62 @@ def favicon():
 
 
 @bp.route('/submit', methods=['POST'])
-def submit():
-    data = request.get_json()
-    url = data.get('text', '').strip()
+@bp.arguments(SubmitRequestSchema)
+@bp.response(200, SubmitResponseSchema)
+@bp.alt_response(422, schema=ErrorSchema)
+def submit(payload):
+    url = payload['text'].strip()
 
     if not url:
-        return jsonify({'success': False, 'message': 'URL cannot be empty'}), 400
+        abort(422, message='URL cannot be empty')
 
     job_id = queue_url(url)
     queue_position = len([v for v in download_status.values() if v['status'] == 'queued'])
 
-    return jsonify({
+    return {
         'success': True,
         'message': 'URL queued for download',
         'job_id': job_id,
         'url': url,
         'queue_position': queue_position,
         'status': 'queued',
-    })
+    }
 
 
 @bp.route('/status/<job_id>', methods=['GET'])
+@bp.response(200, StatusResponseSchema)
+@bp.alt_response(404, schema=ErrorSchema)
 def get_status(job_id):
     with thread_lock:
         if job_id in download_status:
-            return jsonify({'success': True, 'status': download_status[job_id]})
-        return jsonify({'success': False, 'message': 'Job not found'}), 404
+            return {'success': True, 'status': download_status[job_id]}
+        abort(404, message='Job not found')
 
 
 @bp.route('/queue', methods=['GET'])
+@bp.response(200, QueueResponseSchema)
 def get_queue():
     with thread_lock:
         queued = [v for v in download_status.values() if v['status'] == 'queued']
         downloading = [v for v in download_status.values() if v['status'] == 'downloading']
         completed = download_history[-10:] if download_history else []
 
-        return jsonify({
+        return {
             'success': True,
             'queued': queued,
             'downloading': downloading,
             'completed': completed,
             'queue_size': len(queued),
             'total_queue_size': len(queued) + len(downloading),
-        })
+        }
 
 
 @bp.route('/history', methods=['DELETE'])
+@bp.response(200, HistoryResponseSchema)
 def clear_history():
     with thread_lock:
         download_history.clear()
         completed_ids = [jid for jid, s in download_status.items() if s['status'] == 'completed']
         for jid in completed_ids:
             del download_status[jid]
-    return jsonify({'status': 'ok'})
+    return {'status': 'ok'}
