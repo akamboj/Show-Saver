@@ -13,7 +13,6 @@ bp = Blueprint('downloads', __name__, description='Download queue operations')
 
 
 @bp.route('/')
-@bp.response(200, content_type='text/html')
 def home():
     return render_template('index.html', version=__version__)
 

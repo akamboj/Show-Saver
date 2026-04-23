@@ -3,7 +3,10 @@ from marshmallow import Schema, fields, validate
 
 # --- /submit ---
 class SubmitRequestSchema(Schema):
-    text = fields.String(required=True, metadata={'description': 'URL to download'}, validate=validate.Length(min=1))
+    text = fields.String(required=True, metadata={'description': 'URL to download'}, validate=[
+        validate.Length(min=1),
+        validate.URL()
+    ])
 
 
 class SubmitResponseSchema(Schema):
