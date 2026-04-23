@@ -1,12 +1,16 @@
-from marshmallow import Schema, fields, validate
+from marshmallow import Schema, fields, pre_load, validate
 
 
 # --- /submit ---
 class SubmitRequestSchema(Schema):
     text = fields.String(required=True, metadata={'description': 'URL to download'}, validate=[
-        validate.Length(min=1),
         validate.URL()
     ])
+    @pre_load
+    def _strip(self, data, **_):
+        if isinstance(data.get['text'], str):
+            data['text'] = data['text'].strip()
+        return data
 
 
 class SubmitResponseSchema(Schema):
