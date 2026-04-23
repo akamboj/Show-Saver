@@ -13,6 +13,7 @@ bp = Blueprint('downloads', __name__, description='Download queue operations')
 
 
 @bp.route('/')
+@bp.response(200, content_type='text/html')
 def home():
     return render_template('index.html', version=__version__)
 
@@ -25,13 +26,8 @@ def favicon():
 @bp.route('/submit', methods=['POST'])
 @bp.arguments(SubmitRequestSchema)
 @bp.response(200, SubmitResponseSchema)
-@bp.alt_response(422)
 def submit(payload):
     url = payload['text'].strip()
-
-    if not url:
-        abort(422, message='URL cannot be empty')
-
     job_id = queue_url(url)
     queue_position = len([v for v in download_status.values() if v['status'] == 'queued'])
 

@@ -1,9 +1,9 @@
-from marshmallow import Schema, fields
+from marshmallow import Schema, fields, validate
 
 
 # --- /submit ---
 class SubmitRequestSchema(Schema):
-    text = fields.String(required=True, metadata={'description': 'URL to download'})
+    text = fields.String(required=True, metadata={'description': 'URL to download'}, validate=validate.Length(min=1))
 
 
 class SubmitResponseSchema(Schema):
@@ -25,11 +25,11 @@ class JobStatusSchema(Schema):
     step = fields.Integer()
     step_type = fields.String()
     total_steps = fields.Integer()
-    started_at = fields.String()
-    completed_at = fields.String()
-    error = fields.String()
-    file_path = fields.String()
-    size = fields.Integer()
+    started_at = fields.String(allow_none=True)
+    completed_at = fields.String(allow_none=True)
+    error = fields.String(allow_none=True)
+    file_path = fields.String(allow_none=True)
+    size = fields.Integer(allow_none=True)
 
 
 class StatusResponseSchema(Schema):

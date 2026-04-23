@@ -74,6 +74,7 @@ def download_worker() -> None:
             url = item['url']
             job_id = item['id']
 
+            # Any updates to data here must be reflected to JobStatusSchema
             with thread_lock:
                 download_status[job_id]['status'] = 'downloading'
                 download_status[job_id]['started_at'] = datetime.now().isoformat()
