@@ -22,7 +22,7 @@ class SubmitResponseSchema(Schema):
     status = fields.String()
 
 
-# --- /status/<job_id> and /queue
+# --- /status/<job_id> and /queue ---
 class JobStatusSchema(Schema):
     id = fields.String()
     url = fields.String()
@@ -58,7 +58,7 @@ class HistoryResponseSchema(Schema):
     status = fields.String()
 
 
-# -- /dropout/new-releases
+# --- /dropout/new-releases ---
 class DropoutVideoSchema(Schema):
     id = fields.Integer()
     title = fields.String()
@@ -79,7 +79,7 @@ class NewReleasesResponseSchema(Schema):
     cached = fields.Boolean()
 
 
-# --- /dropout/info
+# --- /dropout/info ---
 class EpisodeInfoQuerySchema(Schema):
     episode = fields.String(required=True)
 
