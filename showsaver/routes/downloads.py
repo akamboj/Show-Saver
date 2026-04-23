@@ -26,7 +26,7 @@ def favicon():
 @bp.arguments(SubmitRequestSchema)
 @bp.response(200, SubmitResponseSchema)
 def submit(payload):
-    url = payload['text'].strip()
+    url = payload['text']
     job_id = queue_url(url)
     queue_position = len([v for v in download_status.values() if v['status'] == 'queued'])
 

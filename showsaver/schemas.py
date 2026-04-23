@@ -8,7 +8,7 @@ class SubmitRequestSchema(Schema):
     ])
     @pre_load
     def _strip(self, data, **_):
-        if isinstance(data.get['text'], str):
+        if isinstance(data.get('text'), str):
             data['text'] = data['text'].strip()
         return data
 
