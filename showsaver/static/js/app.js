@@ -307,6 +307,7 @@ function renderReleases(videos) {
                 ${video.duration ? `<span class="release-duration">${formatDuration(video.duration)}</span>` : ''}
             </div>
             <div class="release-info">
+                <div class="release-show">${video.show_name || ''}</div>
                 <div class="release-title">${video.title || (video.url.includes('videos/') ? video.url.split('videos/').pop() : video.url)}</div>
             </div>
         </div>
@@ -329,8 +330,7 @@ async function fetchNewReleases() {
         if (data.success) {
             const limitedVideos = data.videos.slice(0, 9);
             renderReleases(limitedVideos);
-            // Async fetch details for each video
-            fetchAllEpisodeDetails(limitedVideos);
+            startReleasesPolling(limitedVideos);
         } else {
             releasesGrid.innerHTML = `<div class="error-releases">Failed to load releases</div>`;
         }
@@ -342,25 +342,40 @@ async function fetchNewReleases() {
     }
 }
 
-function fetchAllEpisodeDetails(videos) {
-    videos.forEach(video => {
-        if (!video.title || !video.thumbnail) {
-            fetchEpisodeInfo(video.url);
-        }
-    });
+let releasesPollTimer = null;
+const RELEASES_POLL_INTERVAL_MS = 2000;
+const RELEASES_POLL_MAX = 30;
+
+function allCardsHaveShowNames(videos) {
+    return videos.every(v => v.show_name && v.show_name.length > 0);
 }
 
-async function fetchEpisodeInfo(url) {
-    try {
-        const response = await fetch(`/dropout/info?episode=${encodeURIComponent(url)}`);
-        const data = await response.json();
-
-        if (data.success) {
-            updateReleaseCard(url, data.info);
-        }
-    } catch (error) {
-        console.error(`Failed to fetch info for ${url}:`, error);
+function startReleasesPolling(initialVideos) {
+    if (releasesPollTimer) {
+        clearInterval(releasesPollTimer);
+        releasesPollTimer = null;
     }
+    if (allCardsHaveShowNames(initialVideos)) return;
+
+    let polls = 0;
+    releasesPollTimer = setInterval(async () => {
+        polls += 1;
+        try {
+            const response = await fetch('/dropout/new-releases');
+            const data = await response.json();
+            if (!data.success) return;
+
+            const videos = data.videos.slice(0, 9);
+            videos.forEach(v => updateReleaseCard(v.url, v));
+
+            if (allCardsHaveShowNames(videos) || polls >= RELEASES_POLL_MAX) {
+                clearInterval(releasesPollTimer);
+                releasesPollTimer = null;
+            }
+        } catch (err) {
+            console.error('Releases poll failed:', err);
+        }
+    }, RELEASES_POLL_INTERVAL_MS);
 }
 
 function updateReleaseCard(url, info) {
@@ -371,6 +386,12 @@ function updateReleaseCard(url, info) {
     const img = card.querySelector('.release-thumbnail img');
     if (img && info.thumbnail) {
         img.src = info.thumbnail;
+    }
+
+    // Update show name
+    const showName = card.querySelector('.release-show');
+    if (showName && info.show_name) {
+        showName.textContent = info.show_name;
     }
 
     // Update title

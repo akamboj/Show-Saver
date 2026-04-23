@@ -1,22 +1,23 @@
+import database
+from downloader import BASE_YT_OPTS
+from processors import Processor
+from state import queue_metadata
+
 import requests
 import time
 import yt_dlp
 from bs4 import BeautifulSoup
-from downloader import BASE_YT_OPTS
-from processors import Processor
+from typing import Any
+from urllib.parse import urlparse
 
 DROPOUT_NEW_RELEASES_URL = "https://watch.dropout.tv/new-releases"
 
-# Simple in-memory cache
+# Cache for new releases found on last scrape
 _new_releases_cache = {
     'data': None,
     'timestamp': 0
 }
 CACHE_TTL = 300  # 5 minutes
-
-# Episode info cache (keyed by URL)
-_episode_cache = {}
-EPISODE_CACHE_TTL = 3600  # 1 hour for individual episodes
 
 SHOW_NAME_OVERRIDES = {
     'Very Important People' : 'Very Important People (2023)',
@@ -24,7 +25,7 @@ SHOW_NAME_OVERRIDES = {
 }
 
 class DropoutProcessor(Processor):
-    def process_info_dict(self, info_dict):
+    def process_info_dict(self, info_dict) -> None:
 
         season_number = info_dict.get('season_number', 0)
         if self.__is_last_look(info_dict):
@@ -42,7 +43,7 @@ class DropoutProcessor(Processor):
                 info_dict['season_number'] = season_number - 1
 
 
-    def process_dlp_opts(self, dlp_opts, info_dict):
+    def process_dlp_opts(self, dlp_opts, info_dict) -> None:
 
         if self.__is_last_look(info_dict):
             dlp_opts['outtmpl'] = {'default' : '%(series)s - S00E00 - %(title)s WEBDL-1080p.%(ext)s'}
@@ -52,7 +53,7 @@ class DropoutProcessor(Processor):
             dlp_opts['outtmpl'] = {'default' : f'%(series)s - S{season_number}E%(episode_number)02d - %(title)s WEBDL-1080p.%(ext)s'}
 
 
-    def process_show_name(self, show_name) -> str:
+    def process_show_name(self, show_name: str) -> str:
 
         if show_name in SHOW_NAME_OVERRIDES:
             return SHOW_NAME_OVERRIDES[show_name]
@@ -95,7 +96,7 @@ class DropoutProcessor(Processor):
 
 
 
-def time_to_sec(t) -> int:
+def _time_to_sec(t: str) -> int:
     if not ':' in t:
         return int(t)
 
@@ -108,7 +109,7 @@ def time_to_sec(t) -> int:
         return m * 60 + s
 
 
-def _get_new_releases_bs():
+def _get_new_releases_bs() -> list[dict[str, Any]] | None:
     """
     Use BeautifulSoup to parse webpage to fetch new releases.
     """
@@ -133,7 +134,7 @@ def _get_new_releases_bs():
                     duration_container = list_item.find('div', class_='duration-container')
                     if duration_container:
                         duration_txt = duration_container.text.strip()
-                        duration = time_to_sec(duration_txt)
+                        duration = _time_to_sec(duration_txt)
 
                         extracted_data = {
                             'title': title,
@@ -153,97 +154,97 @@ def _get_new_releases_bs():
         print(f"Failed to retrieve the page. Status code: {response.status_code}")
 
 
-def _get_new_releases_ytdlp():
-    """
-    Use yt-dlp to fetch new release info.
-    """
-    opts = {
-        **BASE_YT_OPTS,
-        'extract_flat': 'in_playlist',  # Get metadata without downloading
-        'list_thumbnails': True,
-        'skip_download': True,
-        'quiet': True,
-    }
-    with yt_dlp.YoutubeDL(opts) as ydl:
-        info = ydl.extract_info(DROPOUT_NEW_RELEASES_URL, download=False)
-
-    videos = []
-    for entry in info.get('entries', []):
-        url = entry.get('url') or entry.get('webpage_url')
-        url = url.replace('/new-releases', '')
-
-        extracted_data = {
-            'title': entry.get('title'),
-            'url': url,
-            'thumbnail': entry.get('thumbnail'),
-            'duration': entry.get('duration'),  # seconds
-            'id': entry.get('id'),
-        }
-
-        videos.append(extracted_data)
-
-    return videos
+def _get_url_path(url: str) -> str:
+    parsed_url = urlparse(url)
+    stripped_path = parsed_url.path.rstrip('/')
+    split_path = stripped_path.split('/')
+    return split_path[-1]
 
 
-def get_new_releases(force_refresh=False):
+def _update_database_episode(video_info: dict) -> None:
+    full_url = video_info.get('url', '')
+    url_path = _get_url_path(full_url)
+
+    database.upsert_dropout_episode(
+        url_path=url_path,
+        url=full_url,
+        show_name=video_info.get('show_name', ''),
+        episode_title=video_info.get('title', ''),
+        thumbnail=video_info.get('thumbnail', ''),
+        duration_secs=video_info.get('duration', -1)
+    )
+
+
+def get_new_releases(force_refresh: bool=False):
     """
     Get list of new releases from Dropout using yt-dlp.
     Returns dict with 'success', 'videos' list, 'cached' flag.
     """
-    # Check cache
     if not force_refresh and _new_releases_cache['data'] and (time.time() - _new_releases_cache['timestamp'] < CACHE_TTL):
-        return {'success': True, 'videos': _new_releases_cache['data'], 'cached': True}
-
+        fetched = [row for row in (database.get_dropout_episode(_get_url_path(u)) for u in _new_releases_cache['data']) if row]
+        if fetched:
+            return {'success': True, 'videos': fetched, 'cached': True}
+    
     try:
-        videos = _get_new_releases_bs()
+        scraped = _get_new_releases_bs() or []
+        videos = []
+        for v in scraped:
+            url_path = _get_url_path(v['url'])
+            # Preserve any existing show_name in data
+            database.upsert_dropout_episode_basic(
+                url_path=url_path,
+                url=v['url'],
+                episode_title=v.get('title', ''),
+                thumbnail=v.get('thumbnail', ''),
+                duration_secs=v.get('duration', -1),
+            )
+            row = database.get_dropout_episode(url_path) or {}
+            merged = {
+                **v,
+                'show_name': row.get('show_name', ''),
+            }
+            videos.append(merged)
 
-        # Update cache
-        _new_releases_cache['data'] = videos
+            if not merged['show_name']:
+                queue_metadata(v['url'], url_path)
+        
+        _new_releases_cache['data'] = [v['url'] for v in videos if v]
         _new_releases_cache['timestamp'] = time.time()
-
         return {'success': True, 'videos': videos, 'cached': False}
-
     except Exception as e:
         return {'success': False, 'error': str(e), 'videos': []}
 
 
-def get_epsiode_info(episode_url):
-    """
-    Get detailed info for a single episode URL.
-    Returns dict with 'success', 'info' dict.
-    """
-    # Check cache
-    if episode_url in _episode_cache:
-        cached = _episode_cache[episode_url]
-        if time.time() - cached['timestamp'] < EPISODE_CACHE_TTL:
-            return {'success': True, 'info': cached['data']}
-
+def fetch_and_store_episode_info(episode_url: str) -> dict[str, Any]:
+    # Run yt-dlp, upsert the full row to DB. Returns the info dict or raises.
     opts = {
         **BASE_YT_OPTS,
         'skip_download': True,
         'quiet': True,
     }
+    with yt_dlp.YoutubeDL(opts) as ydl:
+        info = ydl.extract_info(episode_url, download=False)
+    
+    episode_info = {
+        'title': info.get('title'),
+        'url': info.get('webpage_url'),
+        'thumbnail': info.get('thumbnail'),
+        'duration': info.get('duration'),
+        'description': info.get('description'),
+        'id': info.get('id'),
+        'show_name': info.get('series', ''),
+    }
+    _update_database_episode(episode_info)
+    return episode_info
+    
 
+def get_epsiode_info(episode_url: str):
+    """DB-only read. Background worker is responsible for populating rows."""
     try:
-        with yt_dlp.YoutubeDL(opts) as ydl:
-            info = ydl.extract_info(episode_url, download=False)
-
-        episode_info = {
-            'title': info.get('title'),
-            'url': info.get('webpage_url'),
-            'thumbnail': info.get('thumbnail'),
-            'duration': info.get('duration'),
-            'description': info.get('description'),
-            'id': info.get('id'),
-        }
-
-        # Update cache
-        _episode_cache[episode_url] = {
-            'data': episode_info,
-            'timestamp': time.time()
-        }
-
-        return {'success': True, 'info': episode_info}
-
+        url_path = _get_url_path(episode_url)
+        entry = database.get_dropout_episode(url_path)
+        if entry:
+            return {'success': True, 'info': entry}
+        return {'success': False, 'error': 'not_yet_fetched', 'info': None}
     except Exception as e:
         return {'success': False, 'error': str(e), 'info': None}
