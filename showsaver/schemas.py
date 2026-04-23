@@ -96,4 +96,5 @@ class DropoutEpisodeInfoSchema(Schema):
 
 class EpisodeInfoResponseSchema(Schema):
     success = fields.Boolean()
+    message = fields.String()
     info = fields.Nested(DropoutEpisodeInfoSchema, allow_none=True)

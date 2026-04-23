@@ -38,5 +38,5 @@ def episode_info(query_args):
     if result['success']:
         return {'success': True, 'info': result['info']}
     if result.get('error') == 'not_yet_fetched':
-        return {'success': False, 'info': None}
+        return {'success': False, 'message': 'not_yet_fetched', 'info': None}
     abort(503, message=result.get('error', 'Failed to fetch episode info'))
