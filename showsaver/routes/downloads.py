@@ -12,16 +12,6 @@ from version import __version__
 bp = Blueprint('downloads', __name__, description='Download queue operations')
 
 
-@bp.route('/')
-def home():
-    return render_template('index.html', version=__version__)
-
-
-@bp.route('/favicon.ico')
-def favicon():
-    return redirect(url_for('static', filename='favicon.svg'))
-
-
 @bp.route('/submit', methods=['POST'])
 @bp.arguments(SubmitRequestSchema)
 @bp.response(200, SubmitResponseSchema)

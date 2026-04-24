@@ -19,6 +19,7 @@ from env import (
 from processors import dropout
 from routes.downloads import bp as downloads_bp
 from routes.dropout import bp as dropout_bp
+from routes.views import bp as views_bp
 from sonarr import is_sonarr_enabled
 from state import (
     download_queue, download_status, download_history, thread_lock, queue_url,
@@ -49,6 +50,8 @@ app.config['OPENAPI_VERSION'] = '3.0.3'
 app.config['OPENAPI_URL_PREFIX'] = '/docs'
 app.config['OPENAPI_SWAGGER_UI_PATH'] = '/swagger'
 app.config['OPENAPI_SWAGGER_UI_URL'] = 'https://cdn.jsdelivr.net/npm/swagger-ui-dist@5.32.4/'
+
+app.register_blueprint(views_bp)
 
 api = Api(app)
 api.register_blueprint(downloads_bp)
