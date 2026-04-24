@@ -1,14 +1,13 @@
-from flask import Blueprint, redirect, render_template, url_for
-from version import __version__
+from flask import Blueprint, current_app, render_template
 
 bp = Blueprint('views', __name__)
 
 
 @bp.route('/')
-def home():
-    return render_template('index.html', version=__version__)
+def index():
+    return render_template('index.html')
 
 
 @bp.route('/favicon.ico')
 def favicon():
-    return redirect(url_for('static', filename='favicon.svg'))
+    return current_app.send_static_file('favicon.ico')

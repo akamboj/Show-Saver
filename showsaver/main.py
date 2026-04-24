@@ -51,6 +51,12 @@ app.config['OPENAPI_URL_PREFIX'] = '/docs'
 app.config['OPENAPI_SWAGGER_UI_PATH'] = '/swagger'
 app.config['OPENAPI_SWAGGER_UI_URL'] = 'https://cdn.jsdelivr.net/npm/swagger-ui-dist@5.32.4/'
 
+
+@app.context_processor
+def inject_version():
+    return {'version': __version__}
+
+
 app.register_blueprint(views_bp)
 
 api = Api(app)

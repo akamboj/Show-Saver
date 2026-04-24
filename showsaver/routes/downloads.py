@@ -1,4 +1,3 @@
-from flask import redirect, render_template, url_for
 from flask_smorest import Blueprint, abort
 
 from schemas import (
@@ -7,7 +6,6 @@ from schemas import (
     SubmitRequestSchema, SubmitResponseSchema,
 )
 from state import download_history, download_status, thread_lock, queue_url
-from version import __version__
 
 bp = Blueprint('downloads', __name__, description='Download queue operations')
 
