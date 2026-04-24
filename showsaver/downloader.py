@@ -28,12 +28,34 @@ YT_REPLACE_COLON_ACTION = {
     'when': 'pre_process'
 }
 
+class DownloaderLogger:
+    def debug(self, msg):
+        # yt-dlp sends various info messages here.
+        # To see progress, you'd usually ignore messages that don't start with '[debug]'
+        if msg.startswith('[debug] ') or msg.startswith('[download] '):
+            pass
+        else:
+            self.info(msg)
+            pass
+
+    def info(self, msg):
+        #print(f"YTDLP INFO: {msg}")
+        pass
+
+    def warning(self, msg):
+        if 'Failed to parse XML' not in msg:
+            print(f"YTDLP WARNING: {msg}")
+
+    def error(self, msg):
+        print(f"YTDLP ERROR: {msg}")
+
 def progress_hook(d):
     print(d['_default_template'])
 
 
 BASE_YT_OPTS = {
     #'verbose' : True,
+    'logger': DownloaderLogger(),
     'usenetrc' : True,
     'netrc_location' : str(CONFIG_DIR),
     #'netrc_cmd' : "echo machine dropout login {} password {}".format(USERNAME, PASSWORD),
