@@ -1,5 +1,7 @@
 beautifulsoup4
 flask
+flask-smorest
 gunicorn
-yt-dlp
+marshmallow
 requests
+yt-dlp

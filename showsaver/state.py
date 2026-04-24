@@ -20,6 +20,7 @@ def generate_job_id() -> str:
 
 
 def create_job_status(job_id: str, url: str) -> dict[str, Any]:
+    # Any updates to data here must be reflected to JobStatusSchema
     return {
         'id': job_id,
         'url': url,

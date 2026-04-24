@@ -1,40 +1,42 @@
+from flask_smorest import Blueprint, abort
+
 from processors import dropout
+from schemas import (
+    EpisodeInfoQuerySchema, EpisodeInfoResponseSchema,
+    NewReleasesQuerySchema, NewReleasesResponseSchema
+)
 
-from flask import Blueprint, jsonify, request
-
-bp = Blueprint('dropout', __name__, url_prefix='/dropout')
+bp = Blueprint('dropout', __name__, url_prefix='/dropout', description='Dropout metadata and releases')
 
 
 @bp.route('/new-releases', methods=['GET'])
-def new_releases():
-    force_refresh = request.args.get('refresh', '').lower() == 'true'
+@bp.arguments(NewReleasesQuerySchema, location='query')
+@bp.response(200, NewReleasesResponseSchema)
+@bp.alt_response(503)
+def new_releases(query_args):
+    force_refresh = query_args.get('refresh', False)
     result = dropout.get_new_releases(force_refresh=force_refresh)
 
     if result['success']:
-        return jsonify({
+        return {
             'success': True,
             'videos': result['videos'],
             'count': len(result['videos']),
             'cached': result.get('cached', False),
-        })
-    return jsonify({
-        'success': False,
-        'message': result.get('error', 'Failed to fetch new releases'),
-        'videos': [],
-    }), 503
+        }
+    abort(503, message=result.get('error', 'Failed to fetch new releases'))
 
 
 @bp.route('/info', methods=['GET'])
-def episode_info():
-    episode_url = request.args.get('episode', '')
+@bp.arguments(EpisodeInfoQuerySchema, location='query')
+@bp.response(200, EpisodeInfoResponseSchema)
+@bp.alt_response(503)
+def episode_info(query_args):
+    episode_url = query_args.get('episode', '')
     result = dropout.get_epsiode_info(episode_url)
 
     if result['success']:
-        return jsonify({'success': True, 'info': result['info']})
+        return {'success': True, 'info': result['info']}
     if result.get('error') == 'not_yet_fetched':
-        return jsonify({'success': False, 'message': result.get('error'), 'info': None}), 200
-    return jsonify({
-        'success': False,
-        'message': result.get('error', 'Failed to fetch episode info'),
-        'info': None,
-    }), 503
+        return {'success': False, 'message': 'not_yet_fetched', 'info': None}
+    abort(503, message=result.get('error', 'Failed to fetch episode info'))

@@ -1,6 +1,5 @@
 import database
 import downloader
-from processors import dropout
 
 import logging
 import os
@@ -11,10 +10,13 @@ import yt_dlp
 import yt_dlp.version
 
 from datetime import datetime
+from flask import Flask
+from flask_smorest import Api
+
 from env import (
     CONFIG_DIR, SHOW_DIR, DEBUG, WAIT_FOR_DEBUGGER, FLASK_PORT, URL
 )
-from flask import Flask
+from processors import dropout
 from routes.downloads import bp as downloads_bp
 from routes.dropout import bp as dropout_bp
 from sonarr import is_sonarr_enabled
@@ -22,6 +24,7 @@ from state import (
     download_queue, download_status, download_history, thread_lock, queue_url,
     metadata_queue, metadata_in_flight
 )
+from version import __version__
 
 # Enable remote debugging when debugging is enabled
 if DEBUG:
@@ -40,8 +43,16 @@ if DEBUG:
 URL_LIST_FILE_PATH = os.path.join(CONFIG_DIR, 'urls.txt')
 
 app = Flask(__name__)
-app.register_blueprint(downloads_bp)
-app.register_blueprint(dropout_bp)
+app.config['API_TITLE'] = 'Show-Saver API'
+app.config['API_VERSION'] = __version__
+app.config['OPENAPI_VERSION'] = '3.0.3'
+app.config['OPENAPI_URL_PREFIX'] = '/docs'
+app.config['OPENAPI_SWAGGER_UI_PATH'] = '/swagger'
+app.config['OPENAPI_SWAGGER_UI_URL'] = 'https://cdn.jsdelivr.net/npm/swagger-ui-dist@5.32.4/'
+
+api = Api(app)
+api.register_blueprint(downloads_bp)
+api.register_blueprint(dropout_bp)
 
 class _NoQueueFilter(logging.Filter):
     def filter(self, record):
@@ -63,6 +74,7 @@ def download_worker() -> None:
             url = item['url']
             job_id = item['id']
 
+            # Any updates to data here must be reflected to JobStatusSchema
             with thread_lock:
                 download_status[job_id]['status'] = 'downloading'
                 download_status[job_id]['started_at'] = datetime.now().isoformat()
@@ -98,7 +110,7 @@ def download_worker() -> None:
 
 def metadata_worker() -> None:
     """Background worker that fills in episode metadata via yt-dlp."""
-    print('Metadata thread started')
+    print('Metadata thread started.')
     while True:
         try:
             episode_url_data = metadata_queue.get(timeout=1)
