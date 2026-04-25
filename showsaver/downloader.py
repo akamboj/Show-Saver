@@ -4,10 +4,37 @@ import shutil
 import yt_dlp
 import yt_dlp.postprocessor.metadataparser
 
+from collections.abc import Callable
+from dataclasses import dataclass
+from enum import StrEnum
+
 from env import (
     CONFIG_DIR, TMP_DIR, DO_CLEANUP
 )
 from sonarr import refresh_and_rescan_series
+
+
+class StreamType(StrEnum):
+    VIDEO = 'video'
+    AUDIO = 'audio'
+    VIDEO_AUDIO = 'video+audio'
+
+
+@dataclass(frozen=True, slots=True)
+class ProgressUpdate:
+    percent: float
+    step: int
+    total_steps: int
+    step_type: StreamType
+
+    def __post_init__(self):
+        if not 0.0 <= self.percent <= 100.0:
+            raise ValueError(f"percent out of range: {self.percent}")
+        if self.step < 1 or self.step > self.total_steps:
+            raise ValueError(f"step {self.step} not in 1..{self.total_steps}")
+
+
+ProgressCallback = Callable[[ProgressUpdate], None]
 
 YT_REPLACE_COLON_ACTION = {
     'actions': [
@@ -86,25 +113,28 @@ def get_metadata(show_url):
     return info_dict
 
 
-def download_show(show_url, info_dict, progress_callback=None, processor=None):
-    download_state = {'current_step': 0, 'steps': [], 'last_filename': None}
+def download_show(
+    show_url: str,
+    info_dict: dict,
+    progress_callback: ProgressCallback | None = None,
+    processor=None,
+) -> str:
+    download_state: dict = {'current_step': 0, 'steps': [], 'last_filename': None}
 
     def progress_hook_callback(download_progress):
         print(download_progress['_default_template'])
         if progress_callback and download_progress['status'] == 'downloading':
-            # Detect stream type from info_dict
             info = download_progress.get('info_dict', {})
             vcodec = info.get('vcodec', 'none')
             acodec = info.get('acodec', 'none')
             filename = download_progress.get('filename', '')
 
-            # Determine stream type
             if vcodec != 'none' and acodec == 'none':
-                stream_type = 'video'
+                stream_type = StreamType.VIDEO
             elif acodec != 'none' and vcodec == 'none':
-                stream_type = 'audio'
+                stream_type = StreamType.AUDIO
             else:
-                stream_type = 'video+audio'  # Combined or unknown
+                stream_type = StreamType.VIDEO_AUDIO
 
             # Detect new step (filename changes)
             if filename != download_state['last_filename']:
@@ -115,17 +145,17 @@ def download_show(show_url, info_dict, progress_callback=None, processor=None):
 
             # Calculate progress
             total = download_progress.get('total_bytes') or download_progress.get('total_bytes_estimate')
-            percent = 0
+            percent = 0.0
             if total:
                 percent = (download_progress.get('downloaded_bytes', 0) / total) * 100
 
-            # Report progress with step info
-            progress_callback({
-                'percent': percent,
-                'step': download_state['current_step'],
-                'step_type': stream_type,
-                'total_steps': max(len(download_state['steps']), download_state['current_step'])
-            })
+            #print(f'Eta num {download_progress.get('eta', 0)}. eta str {download_progress.get('_eta_str', '')}')
+            progress_callback(ProgressUpdate(
+                percent=percent,
+                step=download_state['current_step'],
+                total_steps=max(len(download_state['steps']), download_state['current_step']),
+                step_type=stream_type,
+            ))
 
     dlp_opts = {
         **BASE_YT_OPTS,
@@ -221,7 +251,12 @@ def process_urls(url_list, desired_destination):
         print("No initial Urls provided.")
 
 
-def process_url(show_url, desired_destination, progress_callback=None, processor=None):
+def process_url(
+    show_url: str,
+    desired_destination,
+    progress_callback: ProgressCallback | None = None,
+    processor=None,
+) -> None:
     info_dict = get_metadata(show_url)
 
     corrected_url, corrected_info_dict = find_corrected_url(show_url, info_dict)

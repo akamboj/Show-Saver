@@ -1,5 +1,6 @@
 import database
 import downloader
+from downloader import ProgressUpdate
 
 import logging
 import os
@@ -89,12 +90,13 @@ def download_worker() -> None:
                 download_status[job_id]['started_at'] = datetime.now().isoformat()
 
             try:
-                def update_progress(progress_info):
+                def update_progress(progress: ProgressUpdate) -> None:
                     with thread_lock:
-                        download_status[job_id]['progress'] = int(progress_info.get('percent', 0))
-                        download_status[job_id]['step'] = progress_info.get('step', 1)
-                        download_status[job_id]['step_type'] = progress_info.get('step_type', 'downloading')
-                        download_status[job_id]['total_steps'] = progress_info.get('total_steps', 1)
+                        status = download_status[job_id]
+                        status['progress'] = int(progress.percent)
+                        status['step'] = progress.step
+                        status['step_type'] = progress.step_type
+                        status['total_steps'] = progress.total_steps
 
                 downloader.process_url(url, SHOW_DIR, progress_callback=update_progress, processor=dropout.DropoutProcessor())
 
