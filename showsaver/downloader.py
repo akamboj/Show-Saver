@@ -1,6 +1,7 @@
 import os
 import requests
 import shutil
+import time
 import yt_dlp
 import yt_dlp.postprocessor.metadataparser
 
@@ -23,6 +24,9 @@ class StreamType(StrEnum):
 @dataclass(frozen=True, slots=True)
 class ProgressUpdate:
     percent: float
+    total_bytes: float
+    speed_bytes: float
+    eta: float
     step: int
     total_steps: int
     step_type: StreamType
@@ -143,19 +147,25 @@ def download_show(
                     download_state['steps'].append(stream_type)
                     download_state['current_step'] = len(download_state['steps'])
 
-            # Calculate progress
-            total = download_progress.get('total_bytes') or download_progress.get('total_bytes_estimate')
-            percent = 0.0
-            if total:
-                percent = (download_progress.get('downloaded_bytes', 0) / total) * 100
+            try:
+                # Calculate progress
+                total = download_progress.get('total_bytes') or download_progress.get('total_bytes_estimate')
+                percent = 0.0
+                if total:
+                    percent = (download_progress.get('downloaded_bytes', 0) / total) * 100
 
-            #print(f'Eta num {download_progress.get('eta', 0)}. eta str {download_progress.get('_eta_str', '')}')
-            progress_callback(ProgressUpdate(
-                percent=percent,
-                step=download_state['current_step'],
-                total_steps=max(len(download_state['steps']), download_state['current_step']),
-                step_type=stream_type,
-            ))
+                eta = download_progress.get('eta', 0) or 0
+                progress_callback(ProgressUpdate(
+                    percent=percent,
+                    total_bytes=total,
+                    speed_bytes=download_progress.get('speed', 0),
+                    eta=(eta + time.time()),
+                    step=download_state['current_step'],
+                    total_steps=max(len(download_state['steps']), download_state['current_step']),
+                    step_type=stream_type,
+                ))
+            except Exception as e:
+                print(f'Exception: progress_callback: {e}')
 
     dlp_opts = {
         **BASE_YT_OPTS,

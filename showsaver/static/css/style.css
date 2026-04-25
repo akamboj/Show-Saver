@@ -694,6 +694,13 @@ button {
     margin-bottom: 0.25rem;
 }
 
+.queue-item-stats {
+    font-size: 0.7rem;
+    color: #999;
+    margin-top: 0.35rem;
+    font-variant-numeric: tabular-nums;
+}
+
 @media (max-width: 768px) {
     .queue-item-header {
         flex-direction: column;

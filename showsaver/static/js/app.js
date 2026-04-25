@@ -49,6 +49,32 @@ function formatStepType(stepType) {
     return labels[stepType] || 'Downloading';
 }
 
+function formatBytes(bytes) {
+    if (!bytes || bytes <= 0) return '';
+    const units = ['B', 'KB', 'MB', 'GB', 'TB'];
+    let i = 0;
+    let v = bytes;
+    while (v >= 1024 && i < units.length - 1) { v /= 1024; i++; }
+    return `${v.toFixed(v >= 100 || i === 0 ? 0 : 1)} ${units[i]}`;
+}
+
+function formatSpeed(bytesPerSec) {
+    const s = formatBytes(bytesPerSec);
+    return s ? `${s}/s` : '';
+}
+
+function formatEta(etaTimestamp) {
+    if (!etaTimestamp) return '';
+    const remaining = Math.max(0, Math.round(etaTimestamp - Date.now() / 1000));
+    if (remaining <= 0) return '';
+    const h = Math.floor(remaining / 3600);
+    const m = Math.floor((remaining % 3600) / 60);
+    const s = remaining % 60;
+    if (h > 0) return `${h}h ${m}m`;
+    if (m > 0) return `${m}m ${s}s`;
+    return `${s}s`;
+}
+
 // Poll for queue status
 async function updateQueueStatus() {
     try {
@@ -99,6 +125,13 @@ async function updateQueueStatus() {
                         </div>
                         <div class="queue-item-progress">
                             <div class="queue-item-progress-bar" style="width: ${item.progress || 0}%"></div>
+                        </div>
+                        <div class="queue-item-stats">
+                            ${[
+                                formatSpeed(item.speed_bytes),
+                                formatBytes(item.total_bytes),
+                                formatEta(item.eta) ? `ETA ${formatEta(item.eta)}` : ''
+                            ].filter(Boolean).join(' • ')}
                         </div>
                     ` : ''}
                 </div>

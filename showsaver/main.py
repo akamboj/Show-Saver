@@ -94,6 +94,9 @@ def download_worker() -> None:
                     with thread_lock:
                         status = download_status[job_id]
                         status['progress'] = int(progress.percent)
+                        status['total_bytes'] = progress.total_bytes
+                        status['speed_bytes'] = progress.speed_bytes
+                        status['eta'] = progress.eta
                         status['step'] = progress.step
                         status['step_type'] = progress.step_type
                         status['total_steps'] = progress.total_steps
