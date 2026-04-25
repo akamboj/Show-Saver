@@ -63,9 +63,9 @@ function formatSpeed(bytesPerSec) {
     return s ? `${s}/s` : '';
 }
 
-function formatEta(etaTimestamp) {
-    if (!etaTimestamp) return '';
-    const remaining = Math.max(0, Math.round(etaTimestamp - Date.now() / 1000));
+function formatEta(etaSeconds) {
+    if (!etaSeconds) return '';
+    const remaining = Math.max(0, Math.round(etaSeconds));
     if (remaining <= 0) return '';
     const h = Math.floor(remaining / 3600);
     const m = Math.floor((remaining % 3600) / 60);

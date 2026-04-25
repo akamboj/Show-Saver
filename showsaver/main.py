@@ -1,7 +1,3 @@
-import database
-import downloader
-from downloader import ProgressUpdate
-
 import logging
 import os
 import queue
@@ -9,6 +5,9 @@ import threading
 import time
 import yt_dlp
 import yt_dlp.version
+
+import database
+import downloader
 
 from datetime import datetime
 from flask import Flask
@@ -90,7 +89,7 @@ def download_worker() -> None:
                 download_status[job_id]['started_at'] = datetime.now().isoformat()
 
             try:
-                def update_progress(progress: ProgressUpdate) -> None:
+                def update_progress(progress: downloader.ProgressUpdate) -> None:
                     with thread_lock:
                         status = download_status[job_id]
                         status['progress'] = int(progress.percent)
@@ -98,7 +97,7 @@ def download_worker() -> None:
                         status['speed_bytes'] = progress.speed_bytes
                         status['eta'] = progress.eta
                         status['step'] = progress.step
-                        status['step_type'] = progress.step_type
+                        status['step_type'] = str(progress.step_type)
                         status['total_steps'] = progress.total_steps
 
                 downloader.process_url(url, SHOW_DIR, progress_callback=update_progress, processor=dropout.DropoutProcessor())

@@ -31,12 +31,6 @@ class ProgressUpdate:
     total_steps: int
     step_type: StreamType
 
-    def __post_init__(self):
-        if not 0.0 <= self.percent <= 100.0:
-            raise ValueError(f"percent out of range: {self.percent}")
-        if self.step < 1 or self.step > self.total_steps:
-            raise ValueError(f"step {self.step} not in 1..{self.total_steps}")
-
 
 ProgressCallback = Callable[[ProgressUpdate], None]
 
@@ -147,25 +141,21 @@ def download_show(
                     download_state['steps'].append(stream_type)
                     download_state['current_step'] = len(download_state['steps'])
 
-            try:
-                # Calculate progress
-                total = download_progress.get('total_bytes') or download_progress.get('total_bytes_estimate')
-                percent = 0.0
-                if total:
-                    percent = (download_progress.get('downloaded_bytes', 0) / total) * 100
+            # Calculate progress
+            total = download_progress.get('total_bytes') or download_progress.get('total_bytes_estimate')
+            percent = 0.0
+            if total:
+                percent = (download_progress.get('downloaded_bytes', 0) / total) * 100
 
-                eta = download_progress.get('eta', 0) or 0
-                progress_callback(ProgressUpdate(
-                    percent=percent,
-                    total_bytes=total,
-                    speed_bytes=download_progress.get('speed', 0),
-                    eta=(eta + time.time()),
-                    step=download_state['current_step'],
-                    total_steps=max(len(download_state['steps']), download_state['current_step']),
-                    step_type=stream_type,
-                ))
-            except Exception as e:
-                print(f'Exception: progress_callback: {e}')
+            progress_callback(ProgressUpdate(
+                percent=percent,
+                total_bytes=total or 0.0,
+                speed_bytes=download_progress.get('speed', 0.0) or 0.0,
+                eta=download_progress.get('eta', 0.0) or 0.0,
+                step=download_state['current_step'],
+                total_steps=max(len(download_state['steps']), download_state['current_step']),
+                step_type=stream_type,
+            ))
 
     dlp_opts = {
         **BASE_YT_OPTS,
