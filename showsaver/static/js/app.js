@@ -1,14 +1,6 @@
 const form = document.getElementById('textForm');
 const textInput = document.getElementById('textInput');
 const clearBtn = document.getElementById('clearBtn');
-const responseDiv = document.getElementById('response');
-const responseTitle = document.getElementById('responseTitle');
-const responseText = document.getElementById('responseText');
-const statsDiv = document.getElementById('stats');
-const statValue1 = document.getElementById('statValue1');
-const statLabel1 = document.getElementById('statLabel1');
-const statValue2 = document.getElementById('statValue2');
-const statLabel2 = document.getElementById('statLabel2');
 const panelQueueList = document.getElementById('panelQueueList');
 const clearHistoryBtn = document.getElementById('clearHistoryBtn');
 const activityToggle = document.getElementById('activity-toggle');
@@ -33,8 +25,6 @@ activityToggle.addEventListener('click', () => activityPanel.classList.contains(
 activityClose.addEventListener('click', closePanel);
 activityOverlay.addEventListener('click', closePanel);
 
-let activeJobId = null;
-let statusInterval = null;
 let connectionLost = false;
 let prevDownloadingIds = new Set();
 let pendingJob = null;
@@ -167,51 +157,6 @@ async function updateQueueStatus() {
     }
 }
 
-// Poll for specific job status
-async function pollJobStatus(jobId) {
-    if (!jobId) return;
-
-    try {
-        const response = await fetch(`/status/${jobId}`);
-        const data = await response.json();
-
-        if (data.success) {
-            const status = data.status;
-
-            // Update stats
-            statValue1.textContent = status.status.toUpperCase();
-            statLabel1.textContent = 'Status';
-
-            if (status.status === 'queued') {
-                statValue2.textContent = '⏳';
-                statLabel2.textContent = 'In Queue';
-            } else if (status.status === 'downloading') {
-                const stepInfo = status.total_steps > 1
-                    ? `Step ${status.step}/${status.total_steps}`
-                    : 'Progress';
-                statValue2.textContent = `${status.progress || 0}%`;
-                statLabel2.textContent = stepInfo;
-            } else if (status.status === 'completed') {
-                statValue2.textContent = '✓';
-                statLabel2.textContent = 'Done';
-                clearInterval(statusInterval);
-                responseDiv.className = 'response show success';
-                responseTitle.textContent = '✓ Download Complete!';
-                responseText.textContent = `File saved: ${status.filename || 'download'}`;
-            } else if (status.status === 'failed') {
-                statValue2.textContent = '✗';
-                statLabel2.textContent = 'Failed';
-                clearInterval(statusInterval);
-                responseDiv.className = 'response show error';
-                responseTitle.textContent = '✗ Download Failed';
-                responseText.textContent = status.error || 'Unknown error occurred';
-            }
-        }
-    } catch (error) {
-        console.error('Failed to poll job status:', error);
-    }
-}
-
 form.addEventListener('submit', async (e) => {
     e.preventDefault();
 
@@ -240,42 +185,14 @@ form.addEventListener('submit', async (e) => {
         const data = await response.json();
 
         if (data.success) {
-            // Show success response
-            responseDiv.className = 'response show success';
-            responseTitle.textContent = '✓ Queued Successfully!';
-            responseText.textContent = data.message;
-            statsDiv.style.display = 'flex';
-
-            // Update stats
-            statValue1.textContent = 'QUEUED';
-            statLabel1.textContent = 'Status';
-            statValue2.textContent = data.queue_position || '-';
-            statLabel2.textContent = 'Queue Position';
-
-            // Start polling for this job
-            activeJobId = data.job_id;
-            if (statusInterval) clearInterval(statusInterval);
-            statusInterval = setInterval(() => pollJobStatus(activeJobId), 1000);
-
-            // Update pending entry with real job ID
             pendingJob = { id: data.job_id, url: text };
-
-            // Clear input
             textInput.value = '';
         } else {
             pendingJob = null;
-            responseDiv.className = 'response show error';
-            responseTitle.textContent = '✗ Error';
-            responseText.textContent = data.message;
-            statsDiv.style.display = 'none';
         }
 
     } catch (error) {
         pendingJob = null;
-        responseDiv.className = 'response show error';
-        responseTitle.textContent = '✗ Error';
-        responseText.textContent = 'Failed to connect to the server. Please try again.';
-        statsDiv.style.display = 'none';
     } finally {
         submitBtn.disabled = false;
         submitBtn.classList.remove('loading');
@@ -289,25 +206,12 @@ clearHistoryBtn.addEventListener('click', async () => {
 
 clearBtn.addEventListener('click', () => {
     textInput.value = '';
-    responseDiv.classList.remove('show');
-    if (statusInterval) {
-        clearInterval(statusInterval);
-        statusInterval = null;
-    }
-    activeJobId = null;
     textInput.focus();
 });
 
 // Update queue status every 1 second
 setInterval(updateQueueStatus, 1000);
 updateQueueStatus(); // Initial load
-
-// Add subtle interaction feedback
-textInput.addEventListener('input', () => {
-    if (responseDiv.classList.contains('show')) {
-        responseDiv.classList.remove('show');
-    }
-});
 
 // Dropout New Releases Panel
 const releasesGrid = document.getElementById('releasesGrid');
