@@ -99,6 +99,7 @@ def get_metadata(show_url):
     dlp_opts = {
         **BASE_YT_OPTS,
         'skip_download' : True,
+        'extract_flat': 'in_playlist',
         'postprocessors': [
             YT_REPLACE_COLON_ACTION
         ]
@@ -113,7 +114,7 @@ def get_metadata(show_url):
 
 def download_show(
     show_url: str,
-    info_dict: dict,
+    info_dict,
     progress_callback: ProgressCallback | None = None,
     processor=None,
 ) -> str:
@@ -256,8 +257,12 @@ def process_url(
     desired_destination,
     progress_callback: ProgressCallback | None = None,
     processor=None,
-) -> None:
+) -> list[str] | None:
     info_dict = get_metadata(show_url)
+
+    # If we have a playlist return the urls to be processed individually
+    if info_dict.get('_type') == 'playlist':
+        return [e['url'] for e in info_dict.get('entries', []) if e.get('url')]
 
     corrected_url, corrected_info_dict = find_corrected_url(show_url, info_dict)
     if corrected_url and corrected_info_dict:

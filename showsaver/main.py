@@ -74,7 +74,6 @@ def download_worker() -> None:
     """Background worker that processes download queue"""
     print('Download thread started.')
     while True:
-        time.sleep(2)
         try:
             item = download_queue.get(timeout=1)
             if item is None:
@@ -100,7 +99,15 @@ def download_worker() -> None:
                         status['step_type'] = str(progress.step_type)
                         status['total_steps'] = progress.total_steps
 
-                downloader.process_url(url, SHOW_DIR, progress_callback=update_progress, processor=dropout.DropoutProcessor())
+                expanded = downloader.process_url(url, SHOW_DIR, progress_callback=update_progress, processor=dropout.DropoutProcessor())
+
+                if expanded is not None:
+                    for entry_url in expanded:
+                        queue_url(entry_url)
+                    with thread_lock:
+                        download_status.pop(job_id, None)
+                    download_queue.task_done()
+                    continue
 
                 with thread_lock:
                     download_status[job_id]['status'] = 'completed'
@@ -110,6 +117,7 @@ def download_worker() -> None:
                     download_history.append(download_status[job_id].copy())
 
             except Exception as e:
+                print(str(e))
                 with thread_lock:
                     download_status[job_id]['status'] = 'failed'
                     download_status[job_id]['error'] = str(e)
