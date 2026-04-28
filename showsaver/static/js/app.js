@@ -80,7 +80,7 @@ async function updateQueueStatus() {
             const allItems = [
                 ...data.downloading.map(d => ({...d, displayStatus: 'downloading'})),
                 ...data.queued.map(q => ({...q, displayStatus: 'queued'})),
-                ...data.completed.slice(-3).reverse().map(c => ({...c, displayStatus: 'completed'}))
+                ...[...data.completed].reverse().map(c => ({...c, displayStatus: 'completed'}))
             ];
 
             if (pendingJob) {
