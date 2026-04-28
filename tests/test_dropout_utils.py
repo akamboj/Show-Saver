@@ -1,11 +1,6 @@
-import sys
-import os
-
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'showsaver'))
-
-from showsaver.processors.dropout import _time_to_sec, _get_url_path
-
 import pytest
+
+from processors.dropout import _time_to_sec, _get_url_path
 
 
 class TestTimeToSec:
