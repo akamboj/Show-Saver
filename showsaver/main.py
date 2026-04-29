@@ -2,30 +2,29 @@ import logging
 import os
 import queue
 import threading
-import time
 import yt_dlp
 import yt_dlp.version
 
-import database
-import downloader
 
 from datetime import datetime
 from flask import Flask
 from flask_smorest import Api
 
-from env import (
+from showsaver import database
+from showsaver import downloader
+from showsaver.env import (
     CONFIG_DIR, SHOW_DIR, DEBUG, WAIT_FOR_DEBUGGER, FLASK_PORT, URL
 )
-from processors import dropout
-from routes.downloads import bp as downloads_bp
-from routes.dropout import bp as dropout_bp
-from routes.views import bp as views_bp
-from sonarr import is_sonarr_enabled
-from state import (
+from showsaver.processors import dropout
+from showsaver.routes.downloads import bp as downloads_bp
+from showsaver.routes.dropout import bp as dropout_bp
+from showsaver.routes.views import bp as views_bp
+from showsaver.sonarr import is_sonarr_enabled
+from showsaver.state import (
     download_queue, download_status, download_history, thread_lock, queue_url,
     metadata_queue, metadata_in_flight
 )
-from version import __version__
+from showsaver.version import __version__
 
 # Enable remote debugging when debugging is enabled
 if DEBUG:

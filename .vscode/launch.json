@@ -8,7 +8,7 @@
             "name": "Python Run script",
             "type": "debugpy",
             "request": "launch",
-            "program": "showsaver/main.py",
+            "module": "showsaver.main",
             "console": "integratedTerminal",
             "justMyCode": false,
             "env": {
@@ -30,7 +30,7 @@
             "pathMappings": [
                 {
                     "localRoot": "${workspaceFolder}/showsaver",
-                    "remoteRoot": "/app"
+                    "remoteRoot": "/app/showsaver"
                 }
             ],
             "justMyCode": false

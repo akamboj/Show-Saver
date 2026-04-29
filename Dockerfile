@@ -20,7 +20,7 @@ WORKDIR /app
 
 COPY ./requirements.txt /app/requirements.txt
 RUN pip install --requirement /app/requirements.txt --root-user-action=ignore
-COPY ./showsaver /app
+COPY ./showsaver /app/showsaver
 
 RUN mkdir -p /config /tvshows /temp_dir && \
     chown -R appuser:appuser /app /config /tvshows /temp_dir
@@ -33,7 +33,7 @@ COPY entrypoint.sh /entrypoint.sh
 RUN sed -i 's/\r$//' /entrypoint.sh && chmod +x /entrypoint.sh
 ENTRYPOINT ["/entrypoint.sh"]
 
-CMD ["gunicorn", "--bind", "0.0.0.0:5000", "main:app"]
+CMD ["gunicorn", "--bind", "0.0.0.0:5000", "showsaver.main:app"]
 
 # ===== Development stage =====
 FROM base AS dev
@@ -43,4 +43,4 @@ RUN pip install --requirement /app/requirements-dev.txt --root-user-action=ignor
 
 EXPOSE 5678
 
-CMD ["python", "main.py"]
+CMD ["python", "-m", "showsaver.main"]

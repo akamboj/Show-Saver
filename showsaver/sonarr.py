@@ -1,6 +1,6 @@
 import requests
 import time
-from env import SONARR_URL, SONARR_API_KEY
+from showsaver.env import SONARR_URL, SONARR_API_KEY
 
 
 def is_sonarr_enabled() -> bool:

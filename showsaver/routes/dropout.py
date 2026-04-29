@@ -1,7 +1,7 @@
 from flask_smorest import Blueprint, abort
 
-from processors import dropout
-from schemas import (
+from showsaver.processors import dropout
+from showsaver.schemas import (
     EpisodeInfoQuerySchema, EpisodeInfoResponseSchema,
     NewReleasesQuerySchema, NewReleasesResponseSchema
 )

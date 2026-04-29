@@ -1,6 +1,6 @@
 import sqlite3
 import time
-from env import DB_PATH
+from showsaver.env import DB_PATH
 
 
 def get_connection() -> sqlite3.Connection:

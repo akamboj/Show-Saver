@@ -1,11 +1,11 @@
 from flask_smorest import Blueprint, abort
 
-from schemas import (
+from showsaver.schemas import (
     HistoryResponseSchema,
     QueueResponseSchema, StatusResponseSchema,
     SubmitRequestSchema, SubmitResponseSchema,
 )
-from state import download_history, download_status, thread_lock, queue_url
+from showsaver.state import download_history, download_status, thread_lock, queue_url
 
 bp = Blueprint('downloads', __name__, description='Download queue operations')
 
