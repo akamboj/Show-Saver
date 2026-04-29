@@ -1,7 +1,7 @@
-import database
-from downloader import BASE_YT_OPTS
-from processors import Processor
-from state import queue_metadata
+import showsaver.database as database
+from showsaver.downloader import BASE_YT_OPTS
+from showsaver.processors import Processor
+from showsaver.state import queue_metadata
 
 import requests
 import time

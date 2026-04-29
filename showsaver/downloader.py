@@ -1,7 +1,6 @@
 import os
 import requests
 import shutil
-import time
 import yt_dlp
 import yt_dlp.postprocessor.metadataparser
 
@@ -9,10 +8,10 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from enum import StrEnum
 
-from env import (
+from showsaver.env import (
     CONFIG_DIR, TMP_DIR, DO_CLEANUP
 )
-from sonarr import refresh_and_rescan_series
+from showsaver.sonarr import refresh_and_rescan_series
 
 
 class StreamType(StrEnum):
@@ -108,7 +107,7 @@ def get_metadata(show_url):
 
     print('Downloading metadata for url: ' + show_url)
     info_dict = yt.extract_info(show_url)
-    print('\nMetadata download complete!')
+    print('Metadata download complete!')
     return info_dict
 
 

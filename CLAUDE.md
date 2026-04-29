@@ -19,7 +19,7 @@ bash scripts/run_dev.sh       # Linux
 ### Local Python Development
 ```bash
 pip install -r requirements.txt
-python showsaver/main.py
+python -m showsaver.main
 ```
 
 The Flask app runs on http://localhost:5000.
