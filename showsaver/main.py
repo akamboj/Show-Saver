@@ -5,13 +5,13 @@ import threading
 import yt_dlp
 import yt_dlp.version
 
-import showsaver.database as database
-import showsaver.downloader as downloader
 
 from datetime import datetime
 from flask import Flask
 from flask_smorest import Api
 
+from showsaver import database
+from showsaver import downloader
 from showsaver.env import (
     CONFIG_DIR, SHOW_DIR, DEBUG, WAIT_FOR_DEBUGGER, FLASK_PORT, URL
 )
