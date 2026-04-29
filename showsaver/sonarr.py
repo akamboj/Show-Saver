@@ -8,7 +8,7 @@ def is_sonarr_enabled() -> bool:
     return bool(SONARR_URL and SONARR_API_KEY)
 
 
-def _get_headers():
+def _get_headers() -> dict[str, str]:
     """Get headers for Sonarr API requests."""
     return {
         "X-Api-Key": SONARR_API_KEY,
@@ -24,7 +24,7 @@ def get_all_series():
     return response.json()
 
 
-def find_series_by_name(show_name, override_name=None):
+def find_series_by_name(show_name: str, override_name: str|None=None) -> int | None:
     """
     Find a series ID in Sonarr by show name.
 
@@ -35,6 +35,7 @@ def find_series_by_name(show_name, override_name=None):
     Returns:
         Series ID if found, None otherwise
     """
+    search_name = show_name
     if override_name:
         # Apply override if present
         search_name = override_name
@@ -54,11 +55,16 @@ def find_series_by_name(show_name, override_name=None):
         for series in series_list:
             if series.get("title", "").lower() == show_name_lower:
                 return series.get("id")
+            
+    # Try partial name search
+    for series in series_list:
+        if search_name_lower in series.get("title", "").lower():
+            return series.get("id")
 
     return None
 
 
-def rescan_series(series_id):
+def rescan_series(series_id: int):
     """
     Trigger a rescan for a specific series in Sonarr.
 
@@ -98,7 +104,7 @@ def rename_series(series_ids):
     return response.json()
 
 
-def wait_for_command(command_id, timeout=30, poll_interval=3):
+def wait_for_command(command_id, timeout: int=30, poll_interval: int=3):
     """
     Poll /api/v3/command/{id} until Sonarr reports a terminal status.
 
@@ -123,7 +129,7 @@ def wait_for_command(command_id, timeout=30, poll_interval=3):
     return 'timeout'
 
 
-def refresh_and_rescan_series(show_name, override_name=None, do_rename=False):
+def refresh_and_rescan_series(show_name: str, override_name: str|None=None, do_rename: bool=False) -> bool:
     """
     Main entry point: find series and trigger rescan.
 
