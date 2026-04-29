@@ -128,7 +128,7 @@ Optional integration that triggers a series rescan (and optionally rename) in So
 
 ### File Organization
 - Standard episodes: `{SHOW_DIR}/{ShowName}/Season {N}/{filename}`
-- Specials: `{SHOW_DIR}/{ShowName}/Season 00/{filename}`
+- Specials: `{SHOW_DIR}/{ShowName}/Specials/{filename}`
 - Colons (`:`) in titles are replaced with ` -` for filesystem compatibility
 - Directory permissions: `0o777`; file permissions: `0o666`
 
