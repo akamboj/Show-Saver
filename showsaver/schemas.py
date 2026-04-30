@@ -69,6 +69,7 @@ class DropoutVideoSchema(Schema):
     thumbnail = fields.String()
     duration = fields.Integer()
     show_name = fields.String()
+    metadata_fetched_at = fields.Float(allow_none=True)
 
 
 class NewReleasesQuerySchema(Schema):

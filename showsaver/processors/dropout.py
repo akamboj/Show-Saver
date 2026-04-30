@@ -200,21 +200,21 @@ def get_new_releases(force_refresh: bool=False):
                 duration_secs=v.get('duration', -1),
             )
             row = database.get_dropout_episode(url_path) or {}
+            metadata_fetched_at = row.get('metadata_fetched_at')
             merged = {
                 **v,
                 'show_name': row.get('show_name', ''),
+                'metadata_fetched_at': metadata_fetched_at,
             }
             videos.append(merged)
 
-            metadata_fetched_at = row.get('metadata_fetched_at', 0) or 0
-            if not merged['show_name'] and (time.time() - metadata_fetched_at) > METADATA_CACHE_TTL:
+            if not merged['show_name'] and (time.time() - (metadata_fetched_at or 0)) > METADATA_CACHE_TTL:
                 queue_metadata(v['url'], url_path)
         
         _new_releases_cache['data'] = [v['url'] for v in videos if v]
         _new_releases_cache['timestamp'] = time.time()
         return {'success': True, 'videos': videos, 'cached': False}
     except Exception as e:
-        print(str(e))
         return {'success': False, 'error': str(e), 'videos': []}
 
 

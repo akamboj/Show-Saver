@@ -283,8 +283,11 @@ let releasesPollTimer = null;
 const RELEASES_POLL_INTERVAL_MS = 2000;
 const RELEASES_POLL_MAX = 30;
 
-function allCardsHaveShowNames(videos) {
-    return videos.every(v => v.show_name && v.show_name.length > 0);
+function allCardsSettled(videos) {
+    // A card is settled once we have a show_name OR yt-dlp has been tried
+    // (metadata_fetched_at set) — empty show_name after a fetch attempt won't
+    // self-heal until METADATA_CACHE_TTL elapses, so polling further is wasted.
+    return videos.every(v => (v.show_name && v.show_name.length > 0) || v.metadata_fetched_at);
 }
 
 function startReleasesPolling(initialVideos) {
@@ -292,7 +295,7 @@ function startReleasesPolling(initialVideos) {
         clearInterval(releasesPollTimer);
         releasesPollTimer = null;
     }
-    if (allCardsHaveShowNames(initialVideos)) return;
+    if (allCardsSettled(initialVideos)) return;
 
     let polls = 0;
     releasesPollTimer = setInterval(async () => {
@@ -305,7 +308,7 @@ function startReleasesPolling(initialVideos) {
             const videos = data.videos.slice(0, 9);
             videos.forEach(v => updateReleaseCard(v.url, v));
 
-            if (allCardsHaveShowNames(videos) || polls >= RELEASES_POLL_MAX) {
+            if (allCardsSettled(videos) || polls >= RELEASES_POLL_MAX) {
                 clearInterval(releasesPollTimer);
                 releasesPollTimer = null;
             }
