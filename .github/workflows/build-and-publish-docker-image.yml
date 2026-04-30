@@ -15,9 +15,13 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
+env:
+  IMAGE_NAME: akamboj2000/show-saver
+
 jobs:
   tests:
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
     - name: Checkout code
       uses: actions/checkout@v6
@@ -35,6 +39,7 @@ jobs:
   build:
     needs: tests
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     steps:
     - name: Checkout code
       uses: actions/checkout@v6
@@ -53,7 +58,7 @@ jobs:
       id: meta
       uses: docker/metadata-action@v5
       with:
-        images: akamboj2000/show-saver
+        images: ${{ env.IMAGE_NAME }}
         tags: |
           type=ref,event=pr
           type=sha
@@ -68,3 +73,5 @@ jobs:
         target: base
         tags: ${{ steps.meta.outputs.tags }}
         labels: ${{ steps.meta.outputs.labels }}
+        cache-from: type=gha
+        cache-to: type=gha,mode=max
