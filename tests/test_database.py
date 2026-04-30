@@ -69,6 +69,34 @@ class TestUpsertFull:
         assert row['show_name'] == 'New Show'
 
 
+class TestMetadataFetchedAt:
+    def test_basic_leaves_metadata_fetched_at_null(self, db):
+        db.upsert_dropout_episode_basic(URL_PATH, URL, TITLE, THUMB, DURATION)
+        row = db.get_dropout_episode(URL_PATH)
+        assert row['metadata_fetched_at'] is None
+
+    def test_full_upsert_sets_metadata_fetched_at(self, db):
+        db.upsert_dropout_episode(URL_PATH, URL, 'Show', TITLE, THUMB, DURATION)
+        row = db.get_dropout_episode(URL_PATH)
+        assert isinstance(row['metadata_fetched_at'], float)
+
+    def test_basic_after_full_does_not_clobber_metadata_fetched_at(self, db):
+        db.upsert_dropout_episode(URL_PATH, URL, 'Show', TITLE, THUMB, DURATION)
+        before = db.get_dropout_episode(URL_PATH)['metadata_fetched_at']
+        time.sleep(0.01)
+        db.upsert_dropout_episode_basic(URL_PATH, URL, TITLE, THUMB, DURATION)
+        after = db.get_dropout_episode(URL_PATH)['metadata_fetched_at']
+        assert after == before
+
+    def test_full_upsert_advances_metadata_fetched_at(self, db):
+        db.upsert_dropout_episode(URL_PATH, URL, 'Show', TITLE, THUMB, DURATION)
+        first = db.get_dropout_episode(URL_PATH)['metadata_fetched_at']
+        time.sleep(0.01)
+        db.upsert_dropout_episode(URL_PATH, URL, 'Show', TITLE, THUMB, DURATION)
+        second = db.get_dropout_episode(URL_PATH)['metadata_fetched_at']
+        assert second > first
+
+
 class TestReads:
     def test_get_unknown_url_path_returns_none(self, db):
         assert db.get_dropout_episode('does-not-exist') is None

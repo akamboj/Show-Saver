@@ -60,7 +60,6 @@ class DownloaderLogger:
             pass
         else:
             self.info(msg)
-            pass
 
     def info(self, msg):
         #print(f"YTDLP INFO: {msg}")

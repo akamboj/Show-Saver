@@ -69,6 +69,7 @@ class DropoutVideoSchema(Schema):
     thumbnail = fields.String()
     duration = fields.Integer()
     show_name = fields.String()
+    metadata_fetched_at = fields.Float(allow_none=True)
 
 
 class NewReleasesQuerySchema(Schema):
@@ -95,6 +96,7 @@ class DropoutEpisodeInfoSchema(Schema):
     thumbnail = fields.String(allow_none=True)
     duration = fields.Integer(allow_none=True)
     fetched_at = fields.Float(allow_none=True)
+    metadata_fetched_at = fields.Float(allow_none=True)
 
 
 class EpisodeInfoResponseSchema(Schema):
