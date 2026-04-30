@@ -95,6 +95,7 @@ class DropoutEpisodeInfoSchema(Schema):
     thumbnail = fields.String(allow_none=True)
     duration = fields.Integer(allow_none=True)
     fetched_at = fields.Float(allow_none=True)
+    metadata_fetched_at = fields.Float(allow_none=True)
 
 
 class EpisodeInfoResponseSchema(Schema):

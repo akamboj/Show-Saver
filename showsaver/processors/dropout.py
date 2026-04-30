@@ -18,6 +18,7 @@ _new_releases_cache = {
     'timestamp': 0
 }
 CACHE_TTL = 300  # 5 minutes
+METADATA_CACHE_TTL = 7 * 24 * 60 * 60 # 1 week in seconds
 
 SHOW_NAME_OVERRIDES = {
     'Very Important People' : 'Very Important People (2023)',
@@ -205,13 +206,15 @@ def get_new_releases(force_refresh: bool=False):
             }
             videos.append(merged)
 
-            if not merged['show_name']:
+            metadata_fetched_at = row.get('metadata_fetched_at', 0) or 0
+            if not merged['show_name'] and (time.time() - metadata_fetched_at) > METADATA_CACHE_TTL:
                 queue_metadata(v['url'], url_path)
         
         _new_releases_cache['data'] = [v['url'] for v in videos if v]
         _new_releases_cache['timestamp'] = time.time()
         return {'success': True, 'videos': videos, 'cached': False}
     except Exception as e:
+        print(str(e))
         return {'success': False, 'error': str(e), 'videos': []}
 
 

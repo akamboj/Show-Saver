@@ -16,15 +16,19 @@ def init_db() -> None:
         conn.execute("PRAGMA busy_timeout=5000")
         conn.execute("""
             CREATE TABLE IF NOT EXISTS dropout_episodes (
-                     url_path       TEXT PRIMARY KEY,
-                     url            TEXT NOT NULL,
-                     show_name      TEXT NOT NULL,
-                     title          TEXT NOT NULL,
-                     thumbnail      TEXT NOT NULL,
-                     duration       INTEGER NOT NULL,
-                     fetched_at     REAL NOT NULL   -- unix timestamp
+                     url_path             TEXT PRIMARY KEY,
+                     url                  TEXT NOT NULL,
+                     show_name            TEXT NOT NULL,
+                     title                TEXT NOT NULL,
+                     thumbnail            TEXT NOT NULL,
+                     duration             INTEGER NOT NULL,
+                     fetched_at           REAL NOT NULL,  -- unix timestamp; touched by any upsert
+                     metadata_fetched_at  REAL            -- unix timestamp; set only by full yt-dlp upsert
             )
         """)
+        cols = {row['name'] for row in conn.execute("PRAGMA table_info(dropout_episodes)")}
+        if 'metadata_fetched_at' not in cols:
+            conn.execute("ALTER TABLE dropout_episodes ADD COLUMN metadata_fetched_at REAL")
 
 
 def upsert_dropout_episode_basic(url_path: str, url: str, episode_title: str, thumbnail: str, duration_secs: int) -> None:
@@ -43,18 +47,20 @@ def upsert_dropout_episode_basic(url_path: str, url: str, episode_title: str, th
 
 
 def upsert_dropout_episode(url_path: str, url: str, show_name: str, episode_title: str, thumbnail: str, duration_secs: int) -> None:
+    now = time.time()
     with get_connection() as conn:
         conn.execute("""
-            INSERT INTO dropout_episodes (url_path, url, show_name, title, thumbnail, duration, fetched_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?)
+            INSERT INTO dropout_episodes (url_path, url, show_name, title, thumbnail, duration, fetched_at, metadata_fetched_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
             ON CONFLICT(url_path) DO UPDATE SET
                 url = excluded.url,
                 show_name = excluded.show_name,
                 title = excluded.title,
                 thumbnail = excluded.thumbnail,
                 duration = excluded.duration,
-                fetched_at = excluded.fetched_at
-        """, (url_path, url, show_name, episode_title, thumbnail, duration_secs, time.time()))
+                fetched_at = excluded.fetched_at,
+                metadata_fetched_at = excluded.metadata_fetched_at
+        """, (url_path, url, show_name, episode_title, thumbnail, duration_secs, now, now))
 
 
 def get_dropout_episode(url_path: str) -> dict | None:
