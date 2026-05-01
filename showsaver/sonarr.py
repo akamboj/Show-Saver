@@ -158,6 +158,6 @@ def refresh_and_rescan_series(show_name: str, override_name: str|None=None, do_r
         print(f"Sonarr: Rescan finished with status '{final_status}' for '{show_name}'")
 
     if do_rename:
-        rename_ret = rename_series([series_id])
+        rename_series([series_id])
         print(f"Sonarr: Triggered rename for series '{show_name}' (ID: {series_id})")
     return True

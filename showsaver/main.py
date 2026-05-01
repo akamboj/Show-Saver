@@ -34,6 +34,7 @@ if DEBUG:
         debugpy.listen(('0.0.0.0', 5678))
         print('Debugpy listening on port 5678.')
     except RuntimeError:
+        # debugpy.listen() raises RuntimeError if the debug adapter is already listening on that port. The pass swallows that case so startup keeps working.
         pass
     if WAIT_FOR_DEBUGGER:
         print('Waiting for debugger to attach...')
