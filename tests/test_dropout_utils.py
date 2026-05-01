@@ -1,5 +1,3 @@
-import pytest
-
 from showsaver.processors.dropout import _time_to_sec, _get_url_path
 
 
