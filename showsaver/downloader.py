@@ -278,6 +278,7 @@ def process_url(
     try:
         show_name = info_dict.get('series')
         if show_name:
+            override_name = show_name
             should_trigger_rename = False
             if processor:
                 override_name = processor.process_show_name(show_name)
