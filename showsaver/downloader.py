@@ -207,10 +207,10 @@ def copy_to_destination(info_dict, show_path, base_destination_path, processor=N
 
     print(f'Starting copy from: {show_path}, to: {full_destination_path}')
     os.makedirs(full_destination_path, exist_ok=True)
-    os.chmod(full_destination_path, 0o777)
+    os.chmod(full_destination_path, 0o775)
 
     shutil.copy2(show_path, full_episode_path)
-    os.chmod(full_episode_path, 0o666)
+    os.chmod(full_episode_path, 0o664)
     print("Copy complete!")
 
 
@@ -234,7 +234,7 @@ def find_corrected_url(show_url, info_dict):
                 new_info_dict = get_metadata(url_to_try)
                 return url_to_try, new_info_dict
             except Exception as e:
-                pass
+                print(str(e))
     return None, None
 
 
@@ -290,3 +290,5 @@ def process_url(
     if DO_CLEANUP:
         if os.path.exists(show_path):
             os.remove(show_path)
+
+    return None
