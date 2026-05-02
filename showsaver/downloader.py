@@ -7,10 +7,12 @@ import yt_dlp.postprocessor.metadataparser
 from collections.abc import Callable
 from dataclasses import dataclass
 from enum import StrEnum
+from os import PathLike
 
 from showsaver.env import (
     CONFIG_DIR, TMP_DIR, DO_CLEANUP
 )
+from showsaver.processors import Processor
 from showsaver.sonarr import refresh_and_rescan_series
 
 
@@ -53,7 +55,7 @@ YT_REPLACE_COLON_ACTION = {
 }
 
 class DownloaderLogger:
-    def debug(self, msg):
+    def debug(self, msg: str):
         # yt-dlp sends various info messages here.
         # To see progress, you'd usually ignore messages that don't start with '[debug]'
         if msg.startswith('[debug] ') or msg.startswith('[download] '):
@@ -61,15 +63,15 @@ class DownloaderLogger:
         else:
             self.info(msg)
 
-    def info(self, msg):
+    def info(self, msg: str):
         #print(f"YTDLP INFO: {msg}")
         pass
 
-    def warning(self, msg):
+    def warning(self, msg: str):
         if 'Failed to parse XML' not in msg:
             print(f"YTDLP WARNING: {msg}")
 
-    def error(self, msg):
+    def error(self, msg: str):
         print(f"YTDLP ERROR: {msg}")
 
 def progress_hook(d):
@@ -93,7 +95,7 @@ BASE_YT_OPTS = {
 
 
 # the info file has the show name and season number, we need these for building the destination path on the server
-def get_metadata(show_url):
+def get_metadata(show_url: str):
     dlp_opts = {
         **BASE_YT_OPTS,
         'skip_download' : True,
@@ -114,7 +116,7 @@ def download_show(
     show_url: str,
     info_dict,
     progress_callback: ProgressCallback | None = None,
-    processor=None,
+    processor: Processor | None=None,
 ) -> str:
     download_state: dict = {'current_step': 0, 'steps': [], 'last_filename': None}
 
@@ -190,9 +192,14 @@ def download_show(
     return show_path
 
 
-def copy_to_destination(info_dict, show_path, base_destination_path, processor=None):
-    show_name = info_dict['series']
-    season_number = info_dict['season_number']
+def copy_to_destination(
+    info_dict,
+    show_path: str,
+    base_destination_path: str,
+    processor: Processor | None=None
+) -> None:
+    show_name = info_dict.get('series', '')
+    season_number = info_dict.get('season_number', 0)
     season_folder = 'Specials' if season_number == 0 else 'Season ' + str(season_number)
     episode_filename = os.path.basename(show_path)
 
@@ -214,8 +221,8 @@ def copy_to_destination(info_dict, show_path, base_destination_path, processor=N
     print("Copy complete!")
 
 
-def find_corrected_url(show_url, info_dict):
-    show_name = info_dict['series']
+def find_corrected_url(show_url: str, info_dict):
+    show_name = info_dict.get('series', '')
     if 'Dimension 20:' in show_name:
         print(f'Attempting to correct url: {show_url}')
         # Loop through seasons
@@ -238,7 +245,7 @@ def find_corrected_url(show_url, info_dict):
     return None, None
 
 
-def process_urls(url_list, desired_destination):
+def process_urls(url_list: list[str], desired_destination: PathLike) -> None:
     print('********** Processing Urls: **********')
     if len(url_list) > 0:
         for url in url_list:
@@ -252,9 +259,9 @@ def process_urls(url_list, desired_destination):
 
 def process_url(
     show_url: str,
-    desired_destination,
+    desired_destination: PathLike,
     progress_callback: ProgressCallback | None = None,
-    processor=None,
+    processor: Processor | None=None,
 ) -> list[str] | None:
     info_dict = get_metadata(show_url)
 

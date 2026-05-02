@@ -24,7 +24,7 @@ def new_releases(query_args):
             'count': len(result['videos']),
             'cached': result.get('cached', False),
         }
-    abort(503, message=result.get('error', 'Failed to fetch new releases'))
+    return abort(503, message=result.get('error', 'Failed to fetch new releases'))
 
 
 @bp.route('/info', methods=['GET'])
@@ -39,4 +39,4 @@ def episode_info(query_args):
         return {'success': True, 'info': result['info']}
     if result.get('error') == 'not_yet_fetched':
         return {'success': False, 'message': 'not_yet_fetched', 'info': None}
-    abort(503, message=result.get('error', 'Failed to fetch episode info'))
+    return abort(503, message=result.get('error', 'Failed to fetch episode info'))
