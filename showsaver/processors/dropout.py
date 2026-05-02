@@ -150,9 +150,9 @@ def _get_new_releases_bs() -> list[dict[str, Any]] | None:
             return videos
         except Exception as e:
             print(e)
-            return None
     else:
         print(f"Failed to retrieve the page. Status code: {response.status_code}")
+    return None
 
 
 def _get_url_path(url: str) -> str:

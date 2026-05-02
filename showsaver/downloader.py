@@ -234,7 +234,7 @@ def find_corrected_url(show_url, info_dict):
                 new_info_dict = get_metadata(url_to_try)
                 return url_to_try, new_info_dict
             except Exception as e:
-                pass
+                print(str(e))
     return None, None
 
 
@@ -290,3 +290,5 @@ def process_url(
     if DO_CLEANUP:
         if os.path.exists(show_path):
             os.remove(show_path)
+
+    return None
