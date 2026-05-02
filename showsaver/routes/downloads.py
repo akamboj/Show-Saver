@@ -35,7 +35,7 @@ def get_status(job_id):
     with thread_lock:
         if job_id in download_status:
             return {'success': True, 'status': download_status[job_id]}
-        abort(404, message='Job not found')
+        return abort(404, message='Job not found')
 
 
 @bp.route('/queue', methods=['GET'])
