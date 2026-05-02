@@ -207,10 +207,10 @@ def copy_to_destination(info_dict, show_path, base_destination_path, processor=N
 
     print(f'Starting copy from: {show_path}, to: {full_destination_path}')
     os.makedirs(full_destination_path, exist_ok=True)
-    os.chmod(full_destination_path, 0o777)
+    os.chmod(full_destination_path, 0o775)
 
     shutil.copy2(show_path, full_episode_path)
-    os.chmod(full_episode_path, 0o666)
+    os.chmod(full_episode_path, 0o664)
     print("Copy complete!")
 
 
