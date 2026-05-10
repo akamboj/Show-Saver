@@ -11,3 +11,8 @@ def index():
 @bp.route('/favicon.ico')
 def favicon():
     return current_app.send_static_file('favicon.ico')
+
+
+@bp.route('/health')
+def health():
+    return {'status': 'ok'}, 200
