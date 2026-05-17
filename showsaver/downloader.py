@@ -104,12 +104,11 @@ def get_metadata(show_url: str):
             YT_REPLACE_COLON_ACTION
         ]
     }
-    yt = yt_dlp.YoutubeDL(dlp_opts)
-
-    print('Downloading metadata for url: ' + show_url)
-    info_dict = yt.extract_info(show_url)
-    print('Metadata download complete!')
-    return info_dict
+    with yt_dlp.YoutubeDL(dlp_opts) as yt:
+        print('Downloading metadata for url: ' + show_url)
+        info_dict = yt.extract_info(show_url)
+        print('Metadata download complete!')
+        return info_dict
 
 
 def download_show(
@@ -184,10 +183,9 @@ def download_show(
     }
     if processor:
         processor.process_dlp_opts(dlp_opts, info_dict)
-    yt = yt_dlp.YoutubeDL(dlp_opts)
-
-    yt.download(show_url)
-    show_file_name = yt.evaluate_outtmpl(dlp_opts['outtmpl']['default'], info_dict)
+    with yt_dlp.YoutubeDL(dlp_opts) as yt:
+        yt.download(show_url)
+        show_file_name = yt.evaluate_outtmpl(dlp_opts['outtmpl']['default'], info_dict)
     show_path = os.path.abspath(os.path.join(dlp_opts['paths']['home'], show_file_name))
     return show_path
 
