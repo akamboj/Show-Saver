@@ -72,6 +72,7 @@ if ENABLE_MEMORY_PROFILING:
     from showsaver.routes.debug import bp as debug_bp
     api.register_blueprint(debug_bp)
 
+
 class _NoQueueFilter(logging.Filter):
     def filter(self, record):
         return '/queue' not in record.getMessage()

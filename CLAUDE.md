@@ -35,6 +35,7 @@ The Flask app runs on http://localhost:5000.
 Flask Web Server (main.py)
 ├── Routes: /, /favicon.ico, /submit, /status/<job_id>, /queue, /history
 │            /dropout/new-releases, /dropout/info
+│            /debug/memory (only when ENABLE_MEMORY_PROFILING=true)
 ├── Background download_worker thread → processes queue via downloader.process_url()
 └── Background metadata_worker thread → fills Dropout episode metadata via yt-dlp
 
@@ -114,6 +115,7 @@ Episode metadata for Dropout releases is cached in SQLite at `DB_PATH` (default 
 | FLASK_PORT | 5000 | Flask server port |
 | IS_DEBUG | false | Enables Flask debug mode and debugpy |
 | WAIT_FOR_DEBUGGER | false | Pauses startup until debugger connects (port 5678) |
+| ENABLE_MEMORY_PROFILING | false | Starts `tracemalloc` and registers the `/debug/memory` diagnostic endpoint |
 | SONARR_URL | (empty) | Sonarr API URL (e.g., http://localhost:8989) |
 | SONARR_API_KEY | (empty) | Sonarr API key for authentication |
 

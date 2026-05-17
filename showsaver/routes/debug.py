@@ -11,7 +11,10 @@ _baseline: dict = {'snapshot': None}
 @bp.route('/memory', methods=['GET'])
 def memory():
     action = request.args.get('action', 'diff')
-    limit = int(request.args.get('limit', '25'))
+    try:
+        limit = max(1, min(int(request.args.get('limit', '25')), 200))
+    except ValueError:
+        return jsonify({'error': 'limit must be an integer'}), 400
 
     if not tracemalloc.is_tracing():
         return jsonify({'error': 'tracemalloc not started (set IS_DEBUG=true and ENABLE_MEMORY_PROFILING=true)'}), 400
