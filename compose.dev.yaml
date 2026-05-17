@@ -12,6 +12,7 @@ services:
             - ./dev.env
         environment:
             - IS_DEBUG=true
+            - ENABLE_MEMORY_PROFILING=${ENABLE_MEMORY_PROFILING:-true}
             - TZ=America/Los_Angeles
         volumes:
             - ./.local/config:/config

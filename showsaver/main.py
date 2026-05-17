@@ -13,7 +13,7 @@ from flask_smorest import Api
 from showsaver import database
 from showsaver import downloader
 from showsaver.env import (
-    CONFIG_DIR, SHOW_DIR, DEBUG, WAIT_FOR_DEBUGGER, FLASK_PORT, URL
+    CONFIG_DIR, SHOW_DIR, DEBUG, ENABLE_MEMORY_PROFILING, WAIT_FOR_DEBUGGER, FLASK_PORT, URL
 )
 from showsaver.processors import dropout
 from showsaver.routes.downloads import bp as downloads_bp
@@ -41,6 +41,11 @@ if DEBUG:
         debugpy.wait_for_client()
         print('Debugger attached!')
 
+if ENABLE_MEMORY_PROFILING:
+    import tracemalloc
+    tracemalloc.start(10)
+    print('tracemalloc started.')
+
 URL_LIST_FILE_PATH = os.path.join(CONFIG_DIR, 'urls.txt')
 
 app = Flask(__name__)
@@ -62,6 +67,11 @@ app.register_blueprint(views_bp)
 api = Api(app)
 api.register_blueprint(downloads_bp)
 api.register_blueprint(dropout_bp)
+
+if ENABLE_MEMORY_PROFILING:
+    from showsaver.routes.debug import bp as debug_bp
+    api.register_blueprint(debug_bp)
+
 
 class _NoQueueFilter(logging.Filter):
     def filter(self, record):

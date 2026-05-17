@@ -18,6 +18,7 @@ TMP_DIR = Path(os.getenv("TMP_DIR", "/temp_dir"))
 
 DEBUG = string_to_bool(os.getenv("IS_DEBUG", "false"))
 WAIT_FOR_DEBUGGER = string_to_bool(os.getenv("WAIT_FOR_DEBUGGER", "false"))
+ENABLE_MEMORY_PROFILING = string_to_bool(os.getenv("ENABLE_MEMORY_PROFILING", "false"))
 FLASK_PORT = int(os.getenv("FLASK_PORT", "5000"))
 
 #
