@@ -29,6 +29,54 @@ let connectionLost = false;
 let prevDownloadingIds = new Set();
 let pendingJob = null;
 const connectionToast = document.getElementById('connectionError');
+const SAFE_STATUS_CLASSES = new Set(['pending', 'queued', 'downloading', 'completed', 'failed']);
+const PLACEHOLDER_THUMB = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 320 180'%3E%3Crect fill='%232a2a2a' width='320' height='180'/%3E%3Crect x='100' y='45' width='120' height='75' rx='4' fill='none' stroke='%23555' stroke-width='4'/%3E%3Crect x='110' y='55' width='100' height='55' fill='%23333'/%3E%3Crect x='140' y='120' width='40' height='8' fill='%23555'/%3E%3Crect x='130' y='128' width='60' height='6' rx='2' fill='%23555'/%3E%3C/svg%3E";
+
+function clearAndAppend(parent, ...nodes) {
+    parent.replaceChildren(...nodes);
+}
+
+function makeElement(tag, classNames = '', text = null) {
+    const element = document.createElement(tag);
+    if (Array.isArray(classNames)) {
+        element.classList.add(...classNames.filter(Boolean));
+    } else if (classNames) {
+        element.className = classNames;
+    }
+    if (text !== null && text !== undefined) {
+        element.textContent = text;
+    }
+    return element;
+}
+
+function makeMessage(className, text) {
+    return makeElement('div', className, text);
+}
+
+function normalizeStatusClass(status) {
+    return SAFE_STATUS_CLASSES.has(status) ? status : 'pending';
+}
+
+function clampPercent(value) {
+    const percent = Number(value);
+    if (!Number.isFinite(percent)) return 0;
+    return Math.min(100, Math.max(0, percent));
+}
+
+function safeImageSrc(value, fallback = PLACEHOLDER_THUMB) {
+    if (!value || value === fallback) return fallback;
+
+    try {
+        const url = new URL(value, window.location.origin);
+        if (url.protocol === 'http:' || url.protocol === 'https:') {
+            return url.href;
+        }
+    } catch (error) {
+        return fallback;
+    }
+
+    return fallback;
+}
 
 function formatStepType(stepType) {
     const labels = {
@@ -63,6 +111,43 @@ function formatEta(etaSeconds) {
     if (h > 0) return `${h}h ${m}m`;
     if (m > 0) return `${m}m ${s}s`;
     return `${s}s`;
+}
+
+function renderQueueItems(allItems) {
+    const queueItems = allItems.map(item => {
+        const statusClass = normalizeStatusClass(item.displayStatus);
+        const queueItem = makeElement('div', ['queue-item', statusClass]);
+        const header = makeElement('div', 'queue-item-header');
+        const url = makeElement('div', 'queue-item-url', item.url || '');
+        const status = makeElement('div', ['queue-item-status', statusClass], item.status || '');
+
+        url.title = item.url || '';
+        header.append(url, status);
+        queueItem.appendChild(header);
+
+        if (item.displayStatus === 'downloading') {
+            const step = item.step || 1;
+            const totalSteps = item.total_steps || 1;
+            const stepLabel = formatStepType(item.step_type);
+            const progress = makeElement('div', 'queue-item-progress');
+            const progressBar = makeElement('div', 'queue-item-progress-bar');
+            const stats = [
+                formatSpeed(item.speed_bytes),
+                formatBytes(item.total_bytes),
+                formatEta(item.eta) ? `ETA ${formatEta(item.eta)}` : ''
+            ].filter(Boolean).join(' • ');
+
+            queueItem.appendChild(makeElement('div', 'queue-item-step', `Step ${step}/${totalSteps}: ${stepLabel}`));
+            progressBar.style.width = `${clampPercent(item.progress)}%`;
+            progress.appendChild(progressBar);
+            queueItem.appendChild(progress);
+            queueItem.appendChild(makeElement('div', 'queue-item-stats', stats));
+        }
+
+        return queueItem;
+    });
+
+    clearAndAppend(panelQueueList, ...queueItems);
 }
 
 // Poll for queue status
@@ -103,29 +188,7 @@ async function updateQueueStatus() {
 
             clearHistoryBtn.style.display = data.completed.length > 0 ? 'block' : 'none';
 
-            panelQueueList.innerHTML = allItems.map(item => `
-                <div class="queue-item ${item.displayStatus}">
-                    <div class="queue-item-header">
-                        <div class="queue-item-url" title="${item.url}">${item.url}</div>
-                        <div class="queue-item-status ${item.displayStatus}">${item.status}</div>
-                    </div>
-                    ${item.displayStatus === 'downloading' ? `
-                        <div class="queue-item-step">
-                            Step ${item.step || 1}/${item.total_steps || 1}: ${formatStepType(item.step_type)}
-                        </div>
-                        <div class="queue-item-progress">
-                            <div class="queue-item-progress-bar" style="width: ${item.progress || 0}%"></div>
-                        </div>
-                        <div class="queue-item-stats">
-                            ${[
-                                formatSpeed(item.speed_bytes),
-                                formatBytes(item.total_bytes),
-                                formatEta(item.eta) ? `ETA ${formatEta(item.eta)}` : ''
-                            ].filter(Boolean).join(' • ')}
-                        </div>
-                    ` : ''}
-                </div>
-            `).join('');
+            renderQueueItems(allItems);
 
             const activeCount = data.downloading.length + data.queued.length;
             if (activeCount > 0) {
@@ -230,34 +293,43 @@ function formatDuration(seconds) {
 
 function renderReleases(videos) {
     if (!videos || videos.length === 0) {
-        releasesGrid.innerHTML = '<div class="empty-releases">No releases available</div>';
+        clearAndAppend(releasesGrid, makeMessage('empty-releases', 'No releases available'));
         return;
     }
 
-    // Placeholder thumbnail: dark background with TV/monitor icon
-    const placeholderThumb = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 320 180'%3E%3Crect fill='%232a2a2a' width='320' height='180'/%3E%3Crect x='100' y='45' width='120' height='75' rx='4' fill='none' stroke='%23555' stroke-width='4'/%3E%3Crect x='110' y='55' width='100' height='55' fill='%23333'/%3E%3Crect x='140' y='120' width='40' height='8' fill='%23555'/%3E%3Crect x='130' y='128' width='60' height='6' rx='2' fill='%23555'/%3E%3C/svg%3E";
+    const cards = videos.map(video => {
+        const url = video.url || '';
+        const titleText = video.title || (url.includes('videos/') ? url.split('videos/').pop() : url);
+        const card = makeElement('div', 'release-card');
+        const thumbnail = makeElement('div', 'release-thumbnail');
+        const img = document.createElement('img');
+        const info = makeElement('div', 'release-info');
 
-    releasesGrid.innerHTML = videos.map(video => `
-        <div class="release-card" data-url="${video.url}" title="Click to queue download">
-            <div class="release-thumbnail">
-                <img src="${video.thumbnail || placeholderThumb}" alt="${video.title || 'Video'}" loading="lazy">
-                ${video.duration ? `<span class="release-duration">${formatDuration(video.duration)}</span>` : ''}
-            </div>
-            <div class="release-info">
-                <div class="release-show">${video.show_name || ''}</div>
-                <div class="release-title">${video.title || (video.url.includes('videos/') ? video.url.split('videos/').pop() : video.url)}</div>
-            </div>
-        </div>
-    `).join('');
+        card.dataset.url = url;
+        card.title = 'Click to queue download';
+        card.addEventListener('click', () => queueRelease(url));
 
-    // Add click handlers to cards
-    releasesGrid.querySelectorAll('.release-card').forEach(card => {
-        card.addEventListener('click', () => queueRelease(card.dataset.url));
+        img.src = safeImageSrc(video.thumbnail);
+        img.alt = video.title || 'Video';
+        img.loading = 'lazy';
+        thumbnail.appendChild(img);
+        if (video.duration) {
+            thumbnail.appendChild(makeElement('span', 'release-duration', formatDuration(video.duration)));
+        }
+
+        info.append(
+            makeElement('div', 'release-show', video.show_name || ''),
+            makeElement('div', 'release-title', titleText)
+        );
+        card.append(thumbnail, info);
+        return card;
     });
+
+    clearAndAppend(releasesGrid, ...cards);
 }
 
 async function fetchNewReleases() {
-    releasesGrid.innerHTML = '<div class="loading-releases">Loading releases...</div>';
+    clearAndAppend(releasesGrid, makeMessage('loading-releases', 'Loading releases...'));
     refreshReleasesBtn.classList.add('spinning');
 
     try {
@@ -269,11 +341,11 @@ async function fetchNewReleases() {
             renderReleases(limitedVideos);
             startReleasesPolling(limitedVideos);
         } else {
-            releasesGrid.innerHTML = `<div class="error-releases">Failed to load releases</div>`;
+            clearAndAppend(releasesGrid, makeMessage('error-releases', 'Failed to load releases'));
         }
     } catch (error) {
         console.error('Failed to fetch releases:', error);
-        releasesGrid.innerHTML = `<div class="error-releases">Failed to load releases</div>`;
+        clearAndAppend(releasesGrid, makeMessage('error-releases', 'Failed to load releases'));
     } finally {
         refreshReleasesBtn.classList.remove('spinning');
     }
@@ -319,13 +391,14 @@ function startReleasesPolling(initialVideos) {
 }
 
 function updateReleaseCard(url, info) {
-    const card = releasesGrid.querySelector(`[data-url="${url}"]`);
+    const card = [...releasesGrid.querySelectorAll('.release-card')]
+        .find(candidate => candidate.dataset.url === url);
     if (!card) return;
 
     // Update thumbnail
     const img = card.querySelector('.release-thumbnail img');
     if (img && info.thumbnail) {
-        img.src = info.thumbnail;
+        img.src = safeImageSrc(info.thumbnail);
     }
 
     // Update show name
