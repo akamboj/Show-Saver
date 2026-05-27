@@ -82,7 +82,7 @@ class DropoutProcessor(Processor):
         if 'Very Important People' in series and 'Last Looks' in title:
             return True
         return False
-    
+
 
     def __is_game_changer_bts(self, info_dict) -> bool:
 
@@ -91,7 +91,7 @@ class DropoutProcessor(Processor):
         if 'Game Changer' in series and 'Behind the Scenes' in title:
             return True
         return False
-    
+
 
     def __is_dim20(self, info_dict) -> bool:
 
