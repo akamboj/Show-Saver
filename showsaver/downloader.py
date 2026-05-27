@@ -14,6 +14,7 @@ from showsaver.env import (
 )
 from showsaver.processors import Processor
 from showsaver.sonarr import refresh_and_rescan_series
+from showsaver.text import normalize_title
 
 
 class StreamType(StrEnum):
@@ -80,6 +81,7 @@ def progress_hook(d):
 
 BASE_YT_OPTS = {
     #'verbose' : True,
+    'compat_opts': {'filename-sanitization'},
     'logger': DownloaderLogger(),
     'usenetrc' : True,
     'netrc_location' : str(CONFIG_DIR),
@@ -183,6 +185,7 @@ def download_show(
     }
     if processor:
         processor.process_dlp_opts(dlp_opts, info_dict)
+    info_dict['title'] = normalize_title(info_dict.get('title', ''))
     with yt_dlp.YoutubeDL(dlp_opts) as yt:
         yt.download(show_url)
         show_file_name = yt.evaluate_outtmpl(dlp_opts['outtmpl']['default'], info_dict)
@@ -199,7 +202,7 @@ def copy_to_destination(
     show_name = info_dict.get('series', '')
     season_number = info_dict.get('season_number', 0)
     season_folder = 'Specials' if season_number == 0 else 'Season ' + str(season_number)
-    episode_filename = os.path.basename(show_path)
+    episode_filename = normalize_title(os.path.basename(show_path))
 
     if processor:
         new_show_name = processor.process_show_name(show_name)

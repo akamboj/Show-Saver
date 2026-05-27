@@ -82,3 +82,17 @@ def test_destination_file_is_readable(src_file, dest_dir):
     expected = dest_dir / 'Very Important People' / 'Season 2' / src_file.name
     assert os.access(expected, os.R_OK)
     assert expected.read_bytes() == b'fake video bytes'
+
+
+def test_destination_filename_normalizes_fullwidth_double_quotes(dest_dir, tmp_path):
+    src_dir = tmp_path / 'src'
+    src_dir.mkdir()
+    src_file = src_dir / 'Show - S01E01 - Some \uff02Quoted\uff02 Title WEBDL-1080p.mkv'
+    src_file.write_bytes(b'fake video bytes')
+
+    info = {'series': 'Show', 'season_number': 1}
+    copy_to_destination(info, str(src_file), str(dest_dir))
+
+    expected = dest_dir / 'Show' / 'Season 1' / 'Show - S01E01 - Some \'Quoted\' Title WEBDL-1080p.mkv'
+    assert expected.is_file()
+    assert not (dest_dir / 'Show' / 'Season 1' / src_file.name).exists()
