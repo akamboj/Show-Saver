@@ -2,7 +2,7 @@ import sqlite3
 import time
 
 from showsaver.env import DB_PATH
-from showsaver.text import FULLWIDTH_DOUBLE_QUOTE, normalize_title
+from showsaver.text import DOUBLE_QUOTE, FULLWIDTH_DOUBLE_QUOTE, normalize_title
 
 
 def get_connection() -> sqlite3.Connection:
@@ -34,6 +34,10 @@ def init_db() -> None:
         conn.execute(
             "UPDATE dropout_episodes SET title = replace(title, ?, ?) WHERE instr(title, ?) > 0",
             (FULLWIDTH_DOUBLE_QUOTE, normalize_title(FULLWIDTH_DOUBLE_QUOTE), FULLWIDTH_DOUBLE_QUOTE),
+        )
+        conn.execute(
+            "UPDATE dropout_episodes SET title = replace(title, ?, ?) WHERE instr(title, ?) > 0",
+            (DOUBLE_QUOTE, normalize_title(DOUBLE_QUOTE), DOUBLE_QUOTE),
         )
 
 
