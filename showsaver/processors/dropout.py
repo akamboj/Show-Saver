@@ -29,7 +29,7 @@ class DropoutProcessor(Processor):
     def process_info_dict(self, info_dict) -> None:
 
         season_number = info_dict.get('season_number', 0)
-        if self.__is_last_look(info_dict):
+        if self.treat_as_special(info_dict):
             info_dict['season_number'] = 0
             info_dict['episode_number'] = 0
         elif self.__is_dim20(info_dict):
@@ -46,7 +46,7 @@ class DropoutProcessor(Processor):
 
     def process_dlp_opts(self, dlp_opts, info_dict) -> None:
 
-        if self.__is_last_look(info_dict):
+        if self.treat_as_special(info_dict):
             dlp_opts['outtmpl'] = {'default' : '%(series)s - S00E00 - %(title)s WEBDL-1080p.%(ext)s'}
         elif self.__is_dim20(info_dict) or self.__is_adventuring_party(info_dict):
             # Because of the season number modification we have to specify it directly in the file name template
@@ -64,11 +64,15 @@ class DropoutProcessor(Processor):
     def should_trigger_rename(self, info_dict) -> bool:
 
         series = info_dict.get('series', '')
-        if self.__is_last_look(info_dict):
+        if self.treat_as_special(info_dict):
             return True
         if 'Don\'t Hug Me I\'m Scared' in series:
             return True
         return False
+
+
+    def treat_as_special(self, info_dict) -> bool:
+        return self.__is_last_look(info_dict) or self.__is_game_changer_bts(info_dict)
 
 
     def __is_last_look(self, info_dict) -> bool:
@@ -76,6 +80,15 @@ class DropoutProcessor(Processor):
         series = info_dict.get('series', '')
         title = info_dict.get('title', '')
         if 'Very Important People' in series and 'Last Looks' in title:
+            return True
+        return False
+    
+
+    def __is_game_changer_bts(self, info_dict) -> bool:
+
+        series = info_dict.get('series', '')
+        title = info_dict.get('title', '')
+        if 'Game Changer' in series and 'Behind the Scenes' in title:
             return True
         return False
     

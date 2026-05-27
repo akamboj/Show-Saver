@@ -1,6 +1,8 @@
 import sqlite3
 import time
+
 from showsaver.env import DB_PATH
+from showsaver.text import FULLWIDTH_DOUBLE_QUOTE, normalize_title
 
 
 def get_connection() -> sqlite3.Connection:
@@ -29,10 +31,15 @@ def init_db() -> None:
         cols = {row['name'] for row in conn.execute("PRAGMA table_info(dropout_episodes)")}
         if 'metadata_fetched_at' not in cols:
             conn.execute("ALTER TABLE dropout_episodes ADD COLUMN metadata_fetched_at REAL")
+        conn.execute(
+            "UPDATE dropout_episodes SET title = replace(title, ?, ?) WHERE instr(title, ?) > 0",
+            (FULLWIDTH_DOUBLE_QUOTE, normalize_title(FULLWIDTH_DOUBLE_QUOTE), FULLWIDTH_DOUBLE_QUOTE),
+        )
 
 
 def upsert_dropout_episode_basic(url_path: str, url: str, episode_title: str, thumbnail: str, duration_secs: int) -> None:
     """Upsert scrape-time fields without touching show_name (preserves any yt-dlp-resolved value)."""
+    episode_title = normalize_title(episode_title)
     with get_connection() as conn:
         conn.execute("""
             INSERT INTO dropout_episodes (url_path, url, show_name, title, thumbnail, duration, fetched_at)
@@ -48,6 +55,7 @@ def upsert_dropout_episode_basic(url_path: str, url: str, episode_title: str, th
 
 def upsert_dropout_episode(url_path: str, url: str, show_name: str, episode_title: str, thumbnail: str, duration_secs: int) -> None:
     now = time.time()
+    episode_title = normalize_title(episode_title)
     with get_connection() as conn:
         conn.execute("""
             INSERT INTO dropout_episodes (url_path, url, show_name, title, thumbnail, duration, fetched_at, metadata_fetched_at)
