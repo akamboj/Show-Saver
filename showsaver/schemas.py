@@ -103,3 +103,24 @@ class EpisodeInfoResponseSchema(Schema):
     success = fields.Boolean()
     message = fields.String()
     info = fields.Nested(DropoutEpisodeInfoSchema, allow_none=True)
+
+
+# --- /debug/memory ---
+class ErrorResponseSchema(Schema):
+    error = fields.String()
+
+
+class MemoryAllocatorSchema(Schema):
+    file = fields.String()
+    line = fields.Integer()
+    size_diff_bytes = fields.Integer()
+    count_diff = fields.Integer()
+    size_bytes = fields.Integer()
+    count = fields.Integer()
+
+
+class MemoryResponseSchema(Schema):
+    action = fields.String()
+    traced_current_bytes = fields.Integer()
+    traced_peak_bytes = fields.Integer()
+    top_allocators_by_size_diff = fields.List(fields.Nested(MemoryAllocatorSchema))
