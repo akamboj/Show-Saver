@@ -146,6 +146,6 @@ The `Dockerfile` uses a multi-stage build:
 ### Imports
 Keep all imports in alphabetical order within each group (standard library, third-party, local).
 
-## CI/CD
+## CI/CD and Releases
 
-GitHub Actions workflow builds and publishes Docker image to DockerHub (`akamboj2000/show-saver:latest`) on push/PR to main.
+Workflow: [`.github/workflows/build-and-publish-docker-image.yml`](.github/workflows/build-and-publish-docker-image.yml). Releases are cut from `main` by tagging `vX.Y.Z` after bumping [`showsaver/version.py`](showsaver/version.py) — see [RELEASING.md](RELEASING.md) for the full procedure, branching, Docker tag policy, and pre-release rules.
