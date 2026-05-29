@@ -45,13 +45,14 @@ class TestProcessInfoDictLastLooks:
 class TestProcessInfoDictDimension20:
     # Seaon 27 is now On a Bus S1, and 28 is On a Bus S2. We need to decrement season number for each
     # 5/27/26 - TVDB seasons now match official listings. This is no longer needed for D20
+    # 5/28.26 - TVDB undid the change
     @pytest.mark.parametrize('season_in,season_out', [
         (1, 1),
         (27, 27),
-        (28, 28),
-        (29, 29),
-        (30, 30),
-        (31, 31),
+        (28, 27),
+        (29, 28),
+        (30, 28),
+        (31, 29),
     ])
     def test_dim20_season_offsets(self, processor, season_in, season_out):
         info = {

@@ -35,11 +35,12 @@ class DropoutProcessor(Processor):
         elif self.__is_dim20(info_dict):
             # Seaon 27 is now On a Bus S1, and 28 is On a Bus S2. We need to decrement season number for each
             # 5/27/26 - TVDB seasons now match official listings. This is no longer needed for D20
+            # 5/28.26 - TVDB undid the change
             if season_number > 29:
-                #info_dict['season_number'] = season_number - 2
+                info_dict['season_number'] = season_number - 2
                 pass
             elif season_number > 27:
-                #info_dict['season_number'] = season_number - 1
+                info_dict['season_number'] = season_number - 1
                 pass
         elif self.__is_adventuring_party(info_dict):
             # Season 23 is On a Bus S2 adventuring party. So we need to decrement to match actual expected season number.
