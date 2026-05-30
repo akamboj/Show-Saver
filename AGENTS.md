@@ -148,4 +148,4 @@ Keep all imports in alphabetical order within each group (standard library, thir
 
 ## CI/CD and Releases
 
-Workflow: [`.github/workflows/build-and-publish-docker-image.yml`](.github/workflows/build-and-publish-docker-image.yml). Releases are cut from `main` by tagging `vX.Y.Z` after bumping [`showsaver/version.py`](showsaver/version.py) — see [RELEASING.md](RELEASING.md) for the full procedure, branching, Docker tag policy, and pre-release rules.
+Workflows: [`build-and-publish-docker-image.yml`](.github/workflows/build-and-publish-docker-image.yml) (tests + Docker publish) and [`release-please.yml`](.github/workflows/release-please.yml). Releases are automated with [release-please](https://github.com/googleapis/release-please): merging PRs to `main` with Conventional Commit titles updates a standing "release PR" that bumps [`showsaver/version.py`](showsaver/version.py) and the changelog; merging that PR cuts the `vX.Y.Z` tag, GitHub Release, and tagged Docker images. The version is no longer edited by hand. See [RELEASING.md](RELEASING.md) for branching, Docker tag policy, and pre-release rules.
