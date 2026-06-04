@@ -32,6 +32,7 @@ URL = os.getenv("SHOW_URL", "")
 #
 
 DO_CLEANUP = string_to_bool(os.getenv("AUTO_CLEANUP_TMP", "true"))
+YTDLP_PROGRESS_LOG_INTERVAL = float(os.getenv("YTDLP_PROGRESS_LOG_INTERVAL", "5.0"))
 
 #
 # Database

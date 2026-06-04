@@ -1,6 +1,7 @@
 import os
 import requests
 import shutil
+import time
 import yt_dlp
 import yt_dlp.postprocessor.metadataparser
 
@@ -10,7 +11,7 @@ from enum import StrEnum
 from os import PathLike
 
 from showsaver.env import (
-    CONFIG_DIR, TMP_DIR, DO_CLEANUP
+    CONFIG_DIR, TMP_DIR, DO_CLEANUP, YTDLP_PROGRESS_LOG_INTERVAL
 )
 from showsaver.processors import Processor
 from showsaver.sonarr import refresh_and_rescan_series
@@ -56,13 +57,23 @@ YT_REPLACE_COLON_ACTION = {
 }
 
 class DownloaderLogger:
+    def __init__(self, progress_interval: float = YTDLP_PROGRESS_LOG_INTERVAL):
+        self._progress_interval = progress_interval
+        self._last_progress_emit = 0.0
+
+    def progress(self, msg: str):
+        now = time.monotonic()
+        if now - self._last_progress_emit >= self._progress_interval:
+            self._last_progress_emit = now
+            print(msg)
+
     def debug(self, msg: str):
-        # yt-dlp sends various info messages here.
-        # To see progress, you'd usually ignore messages that don't start with '[debug]'
-        if msg.startswith('[debug] ') or msg.startswith('[download] '):
-            pass
-        else:
-            self.info(msg)
+        if msg.startswith('[debug] '):
+            return
+        if msg.startswith('[download] '):
+            self.progress(msg)
+            return
+        self.info(msg)
 
     def info(self, msg: str):
         #print(f"YTDLP INFO: {msg}")
@@ -75,14 +86,18 @@ class DownloaderLogger:
     def error(self, msg: str):
         print(f"YTDLP ERROR: {msg}")
 
+
+_DOWNLOAD_LOGGER = DownloaderLogger()
+
+
 def progress_hook(d):
-    print(d['_default_template'])
+    _DOWNLOAD_LOGGER.progress(d['_default_template'])
 
 
 BASE_YT_OPTS = {
     #'verbose' : True,
     'compat_opts': {'filename-sanitization'},
-    'logger': DownloaderLogger(),
+    'logger': _DOWNLOAD_LOGGER,
     'usenetrc' : True,
     'netrc_location' : str(CONFIG_DIR),
     #'netrc_cmd' : "echo machine dropout login {} password {}".format(USERNAME, PASSWORD),
@@ -122,7 +137,7 @@ def download_show(
     download_state: dict = {'current_step': 0, 'steps': [], 'last_filename': None}
 
     def progress_hook_callback(download_progress):
-        print(download_progress['_default_template'])
+        #_DOWNLOAD_LOGGER.progress(download_progress['_default_template'])
         if progress_callback and download_progress['status'] == 'downloading':
             info = download_progress.get('info_dict', {})
             vcodec = info.get('vcodec', 'none')
