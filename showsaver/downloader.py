@@ -137,7 +137,6 @@ def download_show(
     download_state: dict = {'current_step': 0, 'steps': [], 'last_filename': None}
 
     def progress_hook_callback(download_progress):
-        #_DOWNLOAD_LOGGER.progress(download_progress['_default_template'])
         if progress_callback and download_progress['status'] == 'downloading':
             info = download_progress.get('info_dict', {})
             vcodec = info.get('vcodec', 'none')
