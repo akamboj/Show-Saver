@@ -76,7 +76,7 @@ class DropoutProcessor(Processor):
 
 
     def treat_as_special(self, info_dict) -> bool:
-        return self.__is_last_look(info_dict) or self.__is_game_changer_bts(info_dict)
+        return self.__is_last_look(info_dict) or self.__is_game_changer_bts(info_dict) or self.__is_smartyshort(info_dict)
 
 
     def __is_last_look(self, info_dict) -> bool:
@@ -93,6 +93,15 @@ class DropoutProcessor(Processor):
         series = info_dict.get('series', '')
         title = info_dict.get('title', '')
         if 'Game Changer' in series and 'Behind the Scenes' in title:
+            return True
+        return False
+    
+
+    def __is_smartyshort(self, info_dict) -> bool:
+
+        series = info_dict.get('series', '')
+        title = info_dict.get('title', '')
+        if 'Smartypants' in series and 'Smartyshorts' in title:
             return True
         return False
 

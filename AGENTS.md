@@ -112,6 +112,7 @@ Episode metadata for Dropout releases is cached in SQLite at `DB_PATH` (default 
 | DB_PATH | {CONFIG_DIR}/showsaver.db | SQLite file for Dropout episode cache (derived, not overridable) |
 | SHOW_URL | (empty) | Single URL to queue on startup |
 | AUTO_CLEANUP_TMP | true | Delete temp files after processing |
+| YTDLP_PROGRESS_LOG_INTERVAL | 5.0 | Minimum seconds between yt-dlp `[download]` progress log lines |
 | FLASK_PORT | 5000 | Flask server port |
 | IS_DEBUG | false | Enables Flask debug mode and debugpy |
 | WAIT_FOR_DEBUGGER | false | Pauses startup until debugger connects (port 5678) |
