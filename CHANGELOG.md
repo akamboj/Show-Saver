@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.4.8](https://github.com/akamboj/Show-Saver/compare/v0.4.7...v0.4.8) (2026-06-26)
+
+
+### Bug Fixes
+
+* strip question marks from titles explicitly ([a816283](https://github.com/akamboj/Show-Saver/commit/a81628311a7774e3181ea1b7f9c4e0f79c43af6b))
+
 ## [0.4.7](https://github.com/akamboj/Show-Saver/compare/v0.4.6...v0.4.7) (2026-06-20)
 
 
