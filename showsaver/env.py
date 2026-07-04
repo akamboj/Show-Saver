@@ -33,6 +33,7 @@ URL = os.getenv("SHOW_URL", "")
 
 DO_CLEANUP = string_to_bool(os.getenv("AUTO_CLEANUP_TMP", "true"))
 YTDLP_PROGRESS_LOG_INTERVAL = float(os.getenv("YTDLP_PROGRESS_LOG_INTERVAL", "5.0"))
+SPECIAL_PATTERNS_PATH = os.getenv("SPECIAL_PATTERNS_PATH", "")  # empty -> bundled showsaver/special_patterns.toml
 
 #
 # Database
