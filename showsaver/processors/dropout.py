@@ -39,10 +39,8 @@ class DropoutProcessor(Processor):
             # 5/28.26 - TVDB undid the change
             if season_number > 29:
                 info_dict['season_number'] = season_number - 2
-                pass
             elif season_number > 27:
                 info_dict['season_number'] = season_number - 1
-                pass
         elif self.__is_adventuring_party(info_dict):
             # Season 23 is On a Bus S2 adventuring party. So we need to decrement to match actual expected season number.
             if season_number > 23:
