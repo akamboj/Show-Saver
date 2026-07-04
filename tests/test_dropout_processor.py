@@ -42,6 +42,46 @@ class TestProcessInfoDictLastLooks:
         assert info['episode_number'] == 4
 
 
+class TestProcessInfoDictOtherSpecials:
+    @pytest.mark.parametrize('series,title', [
+        ('Game Changer', 'Behind the Scenes of "Night Shift"'),
+        ('Smartypants', 'Smartyshorts: Why Pockets Are a Scam'),
+        ('Very Important People', 'Very Important Bonus Content'),
+    ])
+    def test_special_zeros_season_and_episode(self, processor, series, title):
+        info = {
+            'series': series,
+            'title': title,
+            'season_number': 5,
+            'episode_number': 3,
+        }
+        processor.process_info_dict(info)
+        assert info['season_number'] == 0
+        assert info['episode_number'] == 0
+
+    def test_special_match_is_case_insensitive(self, processor):
+        info = {
+            'series': 'very important people',
+            'title': 'last looks: some guest',
+            'season_number': 2,
+            'episode_number': 8,
+        }
+        processor.process_info_dict(info)
+        assert info['season_number'] == 0
+        assert info['episode_number'] == 0
+
+    def test_none_series_and_title_do_not_crash(self, processor):
+        info = {
+            'series': None,
+            'title': None,
+            'season_number': 4,
+            'episode_number': 6,
+        }
+        processor.process_info_dict(info)
+        assert info['season_number'] == 4
+        assert info['episode_number'] == 6
+
+
 class TestProcessInfoDictDimension20:
     # Seaon 27 is now On a Bus S1, and 28 is On a Bus S2. We need to decrement season number for each
     # 5/27/26 - TVDB seasons now match official listings. This is no longer needed for D20

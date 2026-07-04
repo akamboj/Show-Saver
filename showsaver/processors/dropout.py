@@ -1,6 +1,7 @@
 import showsaver.database as database
 from showsaver.downloader import BASE_YT_OPTS
 from showsaver.processors import Processor
+from showsaver.special_patterns import get_special_patterns
 from showsaver.state import queue_metadata
 
 import requests
@@ -76,34 +77,13 @@ class DropoutProcessor(Processor):
 
 
     def treat_as_special(self, info_dict) -> bool:
-        return self.__is_last_look(info_dict) or self.__is_game_changer_bts(info_dict) or self.__is_smartyshort(info_dict)
 
-
-    def __is_last_look(self, info_dict) -> bool:
-
-        series = info_dict.get('series', '')
-        title = info_dict.get('title', '')
-        if 'Very Important People' in series and 'Last Looks' in title:
-            return True
-        return False
-
-
-    def __is_game_changer_bts(self, info_dict) -> bool:
-
-        series = info_dict.get('series', '')
-        title = info_dict.get('title', '')
-        if 'Game Changer' in series and 'Behind the Scenes' in title:
-            return True
-        return False
-    
-
-    def __is_smartyshort(self, info_dict) -> bool:
-
-        series = info_dict.get('series', '')
-        title = info_dict.get('title', '')
-        if 'Smartypants' in series and 'Smartyshorts' in title:
-            return True
-        return False
+        series = info_dict.get('series') or ''
+        title = info_dict.get('title') or ''
+        return any(
+            series_pattern.search(series) and title_pattern.search(title)
+            for series_pattern, title_pattern in get_special_patterns()
+        )
 
 
     def __is_dim20(self, info_dict) -> bool:
