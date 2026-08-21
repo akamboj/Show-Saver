@@ -53,10 +53,24 @@ version and the changelog are computed from them:
 
 | Commit prefix                        | Effect on next version |
 |--------------------------------------|------------------------|
-| `fix:`                               | PATCH bump             |
+| `fix:` (incl. `fix(deps):`)          | PATCH bump             |
 | `feat:`                              | MINOR bump             |
 | `feat!:` / `BREAKING CHANGE:` footer | MAJOR bump             |
-| `chore:`, `docs:`, `refactor:`, …    | no release on their own |
+| `chore:`, `docs:`, `build:`, …       | no release on their own |
+
+Dependencies are pinned in [`requirements.txt`](requirements.txt) /
+[`requirements-dev.txt`](requirements-dev.txt), and Dependabot proposes weekly
+updates: yt-dlp in its own PR, the other Python packages grouped into one.
+pip and docker (base image) PRs are titled `fix(deps): …` because they change
+the shipped image, so merging one queues a PATCH release PR automatically.
+`github-actions` PRs keep `build(deps): …` and never trigger a release on
+their own — they are CI-only.
+
+For an urgent update (e.g. a [yt-dlp](https://github.com/yt-dlp/yt-dlp) fix
+for a Dropout breakage), don't wait for the weekly cycle: GitHub → Insights →
+Dependency graph → **Dependabot** tab → click the **Recent update jobs** /
+"last checked N ago" link next to `requirements.txt`, then **Check for
+updates**. Dependabot re-scans and opens the bump PR immediately.
 
 A push to `main` always publishes `:edge` and `:sha-…` to DockerHub. It does
 **not** touch `:latest`.
@@ -87,6 +101,31 @@ which runs the full pytest suite and publishes `:X.Y.Z`, `:X.Y`, `:latest`, and
 > The tag is pushed with a PAT (`RELEASE_PLEASE_TOKEN`) rather than the default
 > `GITHUB_TOKEN` precisely so that this build workflow fires — token-created
 > tags do not trigger other workflows.
+
+## Cutting a release manually
+
+Sometimes a release is needed when nothing has landed that would queue one:
+
+- **Base-image security rebuilds** — Debian patches `python:3.14-slim` in
+  place without changing the tag, so Dependabot never opens a PR; only a
+  rebuild ships those fixes.
+- Only no-bump commits (`refactor:`, `chore:`, …) have landed but should ship.
+- Forcing a specific version (`1.0.0`, `0.6.0-rc.1`) without hand-writing a
+  `Release-As:` footer commit.
+
+Use the **Cut Release** workflow:
+
+1. GitHub → Actions → **Cut Release** → **Run workflow**.
+2. Pick the bump type (default `patch`), or enter an explicit version
+   (e.g. `0.6.0-rc.1`) to override it.
+3. The workflow pushes an empty `chore: release X.Y.Z` commit with a
+   `Release-As: X.Y.Z` footer to `main`; release-please opens (or updates)
+   the release PR at that version.
+4. Merge the release PR as usual to cut the tag and publish the Docker images.
+
+The push uses the same `RELEASE_PLEASE_TOKEN` PAT as the tag push, and for the
+same reason: commits pushed with the default `GITHUB_TOKEN` do not trigger
+other workflows, so release-please would never see them.
 
 ## Overriding the computed version
 
@@ -120,3 +159,7 @@ GitHub Release is marked as a pre-release and DockerHub gets `:0.4.0-rc.1` only
   last-released version (release-please's source of truth for the baseline).
 - [`.github/workflows/release-please.yml`](.github/workflows/release-please.yml)
   — runs release-please on every push to `main`.
+- [`.github/workflows/cut-release.yml`](.github/workflows/cut-release.yml)
+  — the manual **Cut Release** button described above.
+- [`.github/dependabot.yml`](.github/dependabot.yml) — dependency update
+  schedule, grouping, and the `fix(deps)` commit prefix for pip/docker.
