@@ -16,15 +16,17 @@ on:
         required: false
         type: string
 
+# The default GITHUB_TOKEN needs no write access: checkout and push both
+# authenticate with the RELEASE_PLEASE_TOKEN PAT.
 permissions:
-  contents: write
+  contents: read
 
 jobs:
   cut-release:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
         with:
           ref: main
           # PAT, not GITHUB_TOKEN: pushes made with the default token do not
@@ -41,12 +43,20 @@ jobs:
             next="$OVERRIDE"
           else
             current=$(jq -r '."."' .release-please-manifest.json)
-            current="${current%%-*}"  # drop any pre-release suffix before splitting
-            IFS=. read -r major minor patch <<< "$current"
+            base="${current%%-*}"
+            IFS=. read -r major minor patch <<< "$base"
             case "$BUMP" in
               major) next="$((major + 1)).0.0" ;;
               minor) next="${major}.$((minor + 1)).0" ;;
-              patch) next="${major}.${minor}.$((patch + 1))" ;;
+              patch)
+                # a patch bump from a pre-release graduates it to its final
+                # version (0.6.0-rc.1 -> 0.6.0), not 0.6.1
+                if [ "$base" != "$current" ]; then
+                  next="$base"
+                else
+                  next="${major}.${minor}.$((patch + 1))"
+                fi
+                ;;
             esac
           fi
           if ! echo "$next" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$'; then
