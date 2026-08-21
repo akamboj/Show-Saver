@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.5.1](https://github.com/akamboj/Show-Saver/compare/v0.5.0...v0.5.1) (2026-08-21)
+
+
+### Miscellaneous
+
+* release 0.5.1 ([3756881](https://github.com/akamboj/Show-Saver/commit/37568818bd0b28d37df24a95a8d4b7bb834f877a))
+
 ## [0.5.0](https://github.com/akamboj/Show-Saver/compare/v0.4.8...v0.5.0) (2026-07-04)
 
 
