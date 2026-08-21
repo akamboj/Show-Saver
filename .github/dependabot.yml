@@ -1,9 +1,24 @@
 version: 2
 updates:
+  # Production pip and docker bumps ship in the image, so their PRs are
+  # titled fix(deps): … — release-please counts that as a PATCH and queues
+  # a release PR. Dev-only bumps (requirements-dev.txt) and github-actions
+  # bumps don't ship, so they stay build(deps): and trigger no release.
   - package-ecosystem: pip
     directory: /
     schedule:
       interval: weekly
+    commit-message:
+      prefix: "fix"
+      prefix-development: "build"
+      include: "scope"
+    groups:
+      python-deps:
+        applies-to: version-updates
+        patterns:
+          - "*"
+        exclude-patterns:
+          - "yt-dlp"
 
   - package-ecosystem: github-actions
     directory: /
@@ -14,3 +29,6 @@ updates:
     directory: /
     schedule:
       interval: weekly
+    commit-message:
+      prefix: "fix"
+      include: "scope"

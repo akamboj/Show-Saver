@@ -1,0 +1,71 @@
+name: Cut Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      bump:
+        description: Version bump type
+        type: choice
+        options:
+          - patch
+          - minor
+          - major
+        default: patch
+      version:
+        description: Explicit version override, e.g. 0.6.0-rc.1 (ignores bump type)
+        required: false
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  cut-release:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: main
+          # PAT, not GITHUB_TOKEN: pushes made with the default token do not
+          # trigger other workflows, so release-please would never see the commit.
+          token: ${{ secrets.RELEASE_PLEASE_TOKEN }}
+
+      - name: Compute next version
+        id: version
+        env:
+          BUMP: ${{ inputs.bump }}
+          OVERRIDE: ${{ inputs.version }}
+        run: |
+          if [ -n "$OVERRIDE" ]; then
+            next="$OVERRIDE"
+          else
+            current=$(jq -r '."."' .release-please-manifest.json)
+            base="${current%%-*}"
+            IFS=. read -r major minor patch <<< "$base"
+            case "$BUMP" in
+              major) next="$((major + 1)).0.0" ;;
+              minor) next="${major}.$((minor + 1)).0" ;;
+              patch)
+                if [ "$base" != "$current" ]; then
+                  next="$base"
+                else
+                  next="${major}.${minor}.$((patch + 1))"
+                fi
+                ;;
+            esac
+          fi
+          if ! echo "$next" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$'; then
+            echo "::error::Computed version '${next}' is not valid SemVer"
+            exit 1
+          fi
+          echo "next=${next}" >> "$GITHUB_OUTPUT"
+
+      - name: Push Release-As commit
+        env:
+          NEXT: ${{ steps.version.outputs.next }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit --allow-empty -m "chore: release ${NEXT}" -m "Release-As: ${NEXT}"
+          git push origin main
