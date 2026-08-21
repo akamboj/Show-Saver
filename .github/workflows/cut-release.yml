@@ -16,8 +16,6 @@ on:
         required: false
         type: string
 
-# The default GITHUB_TOKEN needs no write access: checkout and push both
-# authenticate with the RELEASE_PLEASE_TOKEN PAT.
 permissions:
   contents: read
 
@@ -49,8 +47,6 @@ jobs:
               major) next="$((major + 1)).0.0" ;;
               minor) next="${major}.$((minor + 1)).0" ;;
               patch)
-                # a patch bump from a pre-release graduates it to its final
-                # version (0.6.0-rc.1 -> 0.6.0), not 0.6.1
                 if [ "$base" != "$current" ]; then
                   next="$base"
                 else
