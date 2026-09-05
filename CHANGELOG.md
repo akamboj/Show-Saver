@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.5.2](https://github.com/akamboj/Show-Saver/compare/v0.5.1...v0.5.2) (2026-09-05)
+
+
+### Bug Fixes
+
+* **deps:** bump gunicorn from 26.1.0 to 26.2.0 in the python-deps group ([#64](https://github.com/akamboj/Show-Saver/issues/64)) ([9d022b4](https://github.com/akamboj/Show-Saver/commit/9d022b49e7f646732e7550803b517281825ccc1a))
+
 ## [0.5.1](https://github.com/akamboj/Show-Saver/compare/v0.5.0...v0.5.1) (2026-08-21)
 
 
