@@ -291,6 +291,23 @@ function formatDuration(seconds) {
     return `${mins}:${secs.toString().padStart(2, '0')}`;
 }
 
+function setInLibraryBadge(card, inLibrary) {
+    const thumbnail = card.querySelector('.release-thumbnail');
+    if (!thumbnail) return;
+    const existing = thumbnail.querySelector('.release-in-library');
+    if (inLibrary === true) {
+        card.classList.add('in-library');
+        if (!existing) {
+            const badge = makeElement('span', 'release-in-library', '\u2713');
+            badge.title = 'In Sonarr library';
+            thumbnail.appendChild(badge);
+        }
+    } else {
+        card.classList.remove('in-library');
+        if (existing) existing.remove();
+    }
+}
+
 function renderReleases(videos) {
     if (!videos || videos.length === 0) {
         clearAndAppend(releasesGrid, makeMessage('empty-releases', 'No releases available'));
@@ -316,6 +333,7 @@ function renderReleases(videos) {
         if (video.duration) {
             thumbnail.appendChild(makeElement('span', 'release-duration', formatDuration(video.duration)));
         }
+        setInLibraryBadge(card, video.in_library);
 
         info.append(
             makeElement('div', 'release-show', video.show_name || ''),
@@ -328,12 +346,13 @@ function renderReleases(videos) {
     clearAndAppend(releasesGrid, ...cards);
 }
 
-async function fetchNewReleases() {
+async function fetchNewReleases(forceRefresh = false) {
     clearAndAppend(releasesGrid, makeMessage('loading-releases', 'Loading releases...'));
     refreshReleasesBtn.classList.add('spinning');
 
     try {
-        const response = await fetch('/dropout/new-releases');
+        const endpoint = forceRefresh ? '/dropout/new-releases?refresh=true' : '/dropout/new-releases';
+        const response = await fetch(endpoint);
         const data = await response.json();
 
         if (data.success) {
@@ -425,6 +444,9 @@ function updateReleaseCard(url, info) {
         durationSpan.textContent = formatDuration(info.duration);
     }
 
+    // Update Sonarr library badge
+    setInLibraryBadge(card, info.in_library);
+
     // Mark card as loaded
     card.classList.add('details-loaded');
 }
@@ -447,7 +469,7 @@ async function queueRelease(url) {
 }
 
 // Event listeners for releases panel
-refreshReleasesBtn.addEventListener('click', fetchNewReleases);
+refreshReleasesBtn.addEventListener('click', () => fetchNewReleases(true));
 
 // Load releases on page load
 fetchNewReleases();

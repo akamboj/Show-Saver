@@ -70,6 +70,11 @@ class DropoutVideoSchema(Schema):
     duration = fields.Integer()
     show_name = fields.String()
     metadata_fetched_at = fields.Float(allow_none=True)
+    season_number = fields.Integer(allow_none=True)
+    episode_number = fields.Integer(allow_none=True)
+    in_library = fields.Boolean(allow_none=True, metadata={
+        'description': 'True if Sonarr has a file for this episode, False if known but missing, null if unknown'
+    })
 
 
 class NewReleasesQuerySchema(Schema):
@@ -97,6 +102,8 @@ class DropoutEpisodeInfoSchema(Schema):
     duration = fields.Integer(allow_none=True)
     fetched_at = fields.Float(allow_none=True)
     metadata_fetched_at = fields.Float(allow_none=True)
+    season_number = fields.Integer(allow_none=True)
+    episode_number = fields.Integer(allow_none=True)
 
 
 class EpisodeInfoResponseSchema(Schema):

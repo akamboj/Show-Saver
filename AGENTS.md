@@ -46,7 +46,8 @@ downloader.py
 └── process_url()          → master orchestration (metadata → download → organize → Sonarr)
 
 sonarr.py
-└── Sonarr API client: rescan, rename, wait for command completion
+├── Sonarr API client: rescan, rename, wait for command completion
+└── is_episode_in_library()  → episode presence lookup (hasFile) behind a 60 s TTL cache
 
 database.py
 ├── init_db()                        → creates table + enables WAL / busy_timeout
@@ -95,10 +96,12 @@ Processors customize download behavior per content source. `DropoutProcessor` (i
 ### Metadata Caching
 Episode metadata for Dropout releases is cached in SQLite at `DB_PATH` (default `{CONFIG_DIR}/showsaver.db`).
 
-- **Table:** `dropout_episodes(url_path PK, url, show_name, title, thumbnail, duration, fetched_at)`
+- **Table:** `dropout_episodes(url_path PK, url, show_name, title, thumbnail, duration, fetched_at, metadata_fetched_at, season_number, episode_number)`
+- **Season/episode numbers:** stored as the *raw* yt-dlp values by the metadata worker. They are remapped at read time (Dimension 20 offsets, specials → S00E00) by running `DropoutProcessor.process_info_dict()` in `_annotate_in_library()`, so the offset rules live in one place and never get frozen into the DB.
+- **`in_library` field:** each video in `/dropout/new-releases` carries `in_library`: `true` if Sonarr has a file for the episode, `false` if Sonarr knows the episode but has no file, `null` if the show name is not resolved yet, Sonarr is disabled, the series/episode could not be matched, or the lookup failed. Computed on every request via `sonarr.is_episode_in_library()` (cached, never raises). The frontend shows a ✓ badge on the card when `true`.
 - **Scrape path:** `/dropout/new-releases` triggers `get_new_releases()`, which scrapes the public HTML, upserts scrape-time fields via `upsert_dropout_episode_basic()` (preserves any existing `show_name`), and enqueues a background `metadata_worker` job for any row still missing `show_name`.
 - **Worker:** `metadata_worker` (started in `main.py`) runs yt-dlp per URL and calls `upsert_dropout_episode()` with the full row. `metadata_in_flight` (guarded by `thread_lock`) dedups concurrent enqueues.
-- **Frontend polling:** `app.js` polls `/dropout/new-releases` every 2 s (up to 30 polls) until every card has a `show_name`.
+- **Frontend polling:** `app.js` polls `/dropout/new-releases` every 2 s (up to 30 polls) until every card has a `show_name`. The refresh button calls `?refresh=true`, which bypasses the scrape cache and clears the Sonarr cache.
 - **Concurrency:** WAL journal mode + `busy_timeout=5000` are set in `init_db()` so the download worker, metadata worker, and request threads can write concurrently.
 - **In-memory scrape cache:** `_new_releases_cache` holds a URL list with a 5-minute TTL to avoid re-scraping on every poll; the DB is the source of truth for metadata.
 - **Reset:** `bash scripts/reset_db.sh` deletes the local dev DB (`./.local/config/showsaver.db`).
@@ -128,6 +131,11 @@ Optional integration that triggers a series rescan (and optionally rename) in So
 - Non-blocking: Sonarr failures are logged as warnings but never cause downloads to fail
 - Waits for rescan to complete before triggering rename (prevents race conditions)
 - Rename is only triggered when the processor's `should_trigger_rename()` returns `True`
+
+**Episode presence lookup** (`is_episode_in_library(show_name, override_name, season_number, episode_number, title)`):
+- Resolves the series with the same name matching as the download path (`_match_series`: exact override → exact original → substring, case-insensitive), then fetches `GET /api/v3/episode?seriesId=` and matches on `(seasonNumber, episodeNumber)`. When either number is unknown, or the pair is the S00E00 placeholder used for specials, it falls back to a case/punctuation-insensitive title match (`text.title_match_key`).
+- Returns `True`/`False` from Sonarr's `hasFile`, or `None` when disabled, unmatched, or on error. It never raises.
+- Series and per-series episode lists are cached in-module for `SONARR_CACHE_TTL` (60 s) behind a private lock. Failures are cached too (negative caching) and read timeouts are 5 s, so an unreachable Sonarr costs at most one short stall per minute rather than one per frontend poll. `sonarr.clear_cache()` drops the cache; `get_new_releases(force_refresh=True)` calls it.
 
 ### File Organization
 - Standard episodes: `{SHOW_DIR}/{ShowName}/Season {N}/{filename}`

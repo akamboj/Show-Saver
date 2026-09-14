@@ -134,3 +134,58 @@ class TestReads:
         rows = db.get_all_dropout_episodes()
         assert len(rows) == 2
         assert {r['url_path'] for r in rows} == {'a', 'b'}
+
+
+class TestSeasonEpisodeNumbers:
+    def test_full_upsert_persists_season_and_episode(self, db):
+        db.upsert_dropout_episode(URL_PATH, URL, 'Show', TITLE, THUMB, DURATION, season_number=6, episode_number=3)
+        row = db.get_dropout_episode(URL_PATH)
+        assert row['season_number'] == 6
+        assert row['episode_number'] == 3
+
+    def test_full_upsert_without_numbers_stores_null(self, db):
+        db.upsert_dropout_episode(URL_PATH, URL, 'Show', TITLE, THUMB, DURATION)
+        row = db.get_dropout_episode(URL_PATH)
+        assert row['season_number'] is None
+        assert row['episode_number'] is None
+
+    def test_basic_upsert_leaves_numbers_null(self, db):
+        db.upsert_dropout_episode_basic(URL_PATH, URL, TITLE, THUMB, DURATION)
+        row = db.get_dropout_episode(URL_PATH)
+        assert row['season_number'] is None
+        assert row['episode_number'] is None
+
+    def test_basic_after_full_does_not_clobber_numbers(self, db):
+        db.upsert_dropout_episode(URL_PATH, URL, 'Show', TITLE, THUMB, DURATION, season_number=6, episode_number=3)
+        db.upsert_dropout_episode_basic(URL_PATH, URL, TITLE, THUMB, DURATION)
+        row = db.get_dropout_episode(URL_PATH)
+        assert row['season_number'] == 6
+        assert row['episode_number'] == 3
+
+    def test_init_db_migrates_pre_existing_table(self, tmp_path, monkeypatch):
+        monkeypatch.setattr(database, 'DB_PATH', str(tmp_path / 'old.db'))
+        with database.get_connection() as conn:
+            conn.execute("""
+                CREATE TABLE dropout_episodes (
+                    url_path    TEXT PRIMARY KEY,
+                    url         TEXT NOT NULL,
+                    show_name   TEXT NOT NULL,
+                    title       TEXT NOT NULL,
+                    thumbnail   TEXT NOT NULL,
+                    duration    INTEGER NOT NULL,
+                    fetched_at  REAL NOT NULL
+                )
+            """)
+            conn.execute(
+                "INSERT INTO dropout_episodes VALUES (?, ?, ?, ?, ?, ?, ?)",
+                (URL_PATH, URL, 'Show', TITLE, THUMB, DURATION, time.time()),
+            )
+
+        database.init_db()
+
+        with database.get_connection() as conn:
+            cols = {row['name'] for row in conn.execute("PRAGMA table_info(dropout_episodes)")}
+        assert {'metadata_fetched_at', 'season_number', 'episode_number'} <= cols
+        row = database.get_dropout_episode(URL_PATH)
+        assert row['season_number'] is None
+        assert row['episode_number'] is None

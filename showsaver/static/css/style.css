@@ -834,6 +834,19 @@ button {
     border-radius: 4px;
 }
 
+.release-in-library {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    background: rgba(0, 0, 0, 0.8);
+    color: var(--accent);
+    font-size: 0.85rem;
+    font-weight: 700;
+    line-height: 1;
+    padding: 0.3rem 0.45rem;
+    border-radius: 4px;
+}
+
 .release-info {
     padding: 0.75rem 1rem;
 }

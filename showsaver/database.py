@@ -25,12 +25,18 @@ def init_db() -> None:
                      thumbnail            TEXT NOT NULL,
                      duration             INTEGER NOT NULL,
                      fetched_at           REAL NOT NULL,  -- unix timestamp; touched by any upsert
-                     metadata_fetched_at  REAL            -- unix timestamp; set only by full yt-dlp upsert
+                     metadata_fetched_at  REAL,           -- unix timestamp; set only by full yt-dlp upsert
+                     season_number        INTEGER,        -- raw yt-dlp value; remapped at read time by the processor
+                     episode_number       INTEGER         -- raw yt-dlp value
             )
         """)
         cols = {row['name'] for row in conn.execute("PRAGMA table_info(dropout_episodes)")}
         if 'metadata_fetched_at' not in cols:
             conn.execute("ALTER TABLE dropout_episodes ADD COLUMN metadata_fetched_at REAL")
+        if 'season_number' not in cols:
+            conn.execute("ALTER TABLE dropout_episodes ADD COLUMN season_number INTEGER")
+        if 'episode_number' not in cols:
+            conn.execute("ALTER TABLE dropout_episodes ADD COLUMN episode_number INTEGER")
         conn.execute(
             "UPDATE dropout_episodes SET title = replace(title, ?, ?) WHERE instr(title, ?) > 0",
             (FULLWIDTH_DOUBLE_QUOTE, normalize_title(FULLWIDTH_DOUBLE_QUOTE), FULLWIDTH_DOUBLE_QUOTE),
@@ -57,13 +63,25 @@ def upsert_dropout_episode_basic(url_path: str, url: str, episode_title: str, th
         """, (url_path, url, episode_title, thumbnail, duration_secs, time.time()))
 
 
-def upsert_dropout_episode(url_path: str, url: str, show_name: str, episode_title: str, thumbnail: str, duration_secs: int) -> None:
+def upsert_dropout_episode(
+    url_path: str,
+    url: str,
+    show_name: str,
+    episode_title: str,
+    thumbnail: str,
+    duration_secs: int,
+    season_number: int | None = None,
+    episode_number: int | None = None,
+) -> None:
     now = time.time()
     episode_title = normalize_title(episode_title)
     with get_connection() as conn:
         conn.execute("""
-            INSERT INTO dropout_episodes (url_path, url, show_name, title, thumbnail, duration, fetched_at, metadata_fetched_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            INSERT INTO dropout_episodes (
+                url_path, url, show_name, title, thumbnail, duration,
+                fetched_at, metadata_fetched_at, season_number, episode_number
+            )
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ON CONFLICT(url_path) DO UPDATE SET
                 url = excluded.url,
                 show_name = excluded.show_name,
@@ -71,8 +89,10 @@ def upsert_dropout_episode(url_path: str, url: str, show_name: str, episode_titl
                 thumbnail = excluded.thumbnail,
                 duration = excluded.duration,
                 fetched_at = excluded.fetched_at,
-                metadata_fetched_at = excluded.metadata_fetched_at
-        """, (url_path, url, show_name, episode_title, thumbnail, duration_secs, now, now))
+                metadata_fetched_at = excluded.metadata_fetched_at,
+                season_number = excluded.season_number,
+                episode_number = excluded.episode_number
+        """, (url_path, url, show_name, episode_title, thumbnail, duration_secs, now, now, season_number, episode_number))
 
 
 def get_dropout_episode(url_path: str) -> dict | None:

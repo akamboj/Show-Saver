@@ -1,4 +1,5 @@
 import showsaver.database as database
+import showsaver.sonarr as sonarr
 from showsaver.downloader import BASE_YT_OPTS
 from showsaver.processors import Processor
 from showsaver.special_patterns import get_special_patterns
@@ -29,7 +30,7 @@ SHOW_NAME_OVERRIDES = {
 class DropoutProcessor(Processor):
     def process_info_dict(self, info_dict) -> None:
 
-        season_number = info_dict.get('season_number', 0)
+        season_number = info_dict.get('season_number') or 0
         if self.treat_as_special(info_dict):
             info_dict['season_number'] = 0
             info_dict['episode_number'] = 0
@@ -176,7 +177,39 @@ def _update_database_episode(video_info: dict) -> None:
         show_name=video_info.get('show_name', ''),
         episode_title=video_info.get('title', ''),
         thumbnail=video_info.get('thumbnail', ''),
-        duration_secs=video_info.get('duration', -1)
+        duration_secs=video_info.get('duration', -1),
+        season_number=video_info.get('season_number'),
+        episode_number=video_info.get('episode_number'),
+    )
+
+
+def _annotate_in_library(video: dict) -> None:
+    """
+    Set video['in_library'] from Sonarr: True/False if the episode could be
+    matched, None if the show is unknown, Sonarr is disabled, or lookup failed.
+
+    Season/episode numbers are stored raw from yt-dlp and remapped here via the
+    processor so the Dimension 20 offsets / specials rules stay in one place.
+    """
+    show_name = video.get('show_name') or ''
+    if not show_name:
+        video['in_library'] = None
+        return
+
+    processor = DropoutProcessor()
+    info = {
+        'series': show_name,
+        'title': video.get('title') or '',
+        'season_number': video.get('season_number'),
+        'episode_number': video.get('episode_number'),
+    }
+    processor.process_info_dict(info)
+    video['in_library'] = sonarr.is_episode_in_library(
+        show_name,
+        processor.process_show_name(show_name),
+        info['season_number'],
+        info['episode_number'],
+        info['title'],
     )
 
 
@@ -185,9 +218,14 @@ def get_new_releases(force_refresh: bool=False):
     Get list of new releases from Dropout using yt-dlp.
     Returns dict with 'success', 'videos' list, 'cached' flag.
     """
+    if force_refresh:
+        sonarr.clear_cache()
+
     if not force_refresh and _new_releases_cache['data'] and (time.time() - _new_releases_cache['timestamp'] < CACHE_TTL):
         fetched = [row for row in (database.get_dropout_episode(_get_url_path(u)) for u in _new_releases_cache['data']) if row]
         if fetched:
+            for video in fetched:
+                _annotate_in_library(video)
             return {'success': True, 'videos': fetched, 'cached': True}
     
     try:
@@ -209,7 +247,10 @@ def get_new_releases(force_refresh: bool=False):
                 **v,
                 'show_name': row.get('show_name', ''),
                 'metadata_fetched_at': metadata_fetched_at,
+                'season_number': row.get('season_number'),
+                'episode_number': row.get('episode_number'),
             }
+            _annotate_in_library(merged)
             videos.append(merged)
 
             if not merged['show_name'] and (time.time() - (metadata_fetched_at or 0)) > METADATA_CACHE_TTL:
@@ -240,6 +281,8 @@ def fetch_and_store_episode_info(episode_url: str) -> dict[str, Any]:
         'description': info.get('description'),
         'id': info.get('id'),
         'show_name': info.get('series', ''),
+        'season_number': info.get('season_number'),
+        'episode_number': info.get('episode_number'),
     }
     _update_database_episode(episode_info)
     return episode_info
