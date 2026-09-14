@@ -31,12 +31,9 @@ def init_db() -> None:
             )
         """)
         cols = {row['name'] for row in conn.execute("PRAGMA table_info(dropout_episodes)")}
-        if 'metadata_fetched_at' not in cols:
-            conn.execute("ALTER TABLE dropout_episodes ADD COLUMN metadata_fetched_at REAL")
-        if 'season_number' not in cols:
-            conn.execute("ALTER TABLE dropout_episodes ADD COLUMN season_number INTEGER")
-        if 'episode_number' not in cols:
-            conn.execute("ALTER TABLE dropout_episodes ADD COLUMN episode_number INTEGER")
+        for name, col_type in (('metadata_fetched_at', 'REAL'), ('season_number', 'INTEGER'), ('episode_number', 'INTEGER')):
+            if name not in cols:
+                conn.execute(f"ALTER TABLE dropout_episodes ADD COLUMN {name} {col_type}")
         conn.execute(
             "UPDATE dropout_episodes SET title = replace(title, ?, ?) WHERE instr(title, ?) > 0",
             (FULLWIDTH_DOUBLE_QUOTE, normalize_title(FULLWIDTH_DOUBLE_QUOTE), FULLWIDTH_DOUBLE_QUOTE),

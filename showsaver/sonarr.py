@@ -11,6 +11,7 @@ from showsaver.text import title_match_key
 # Failures are cached too (as None) so a down Sonarr costs at most one stalled
 # request per TTL instead of one per frontend poll.
 SONARR_CACHE_TTL = 60  # seconds
+LOOKUP_TIMEOUT = 5  # seconds; read-only lookups must stay short since the frontend polls them
 _cache: dict[str, tuple[float, Any]] = {}
 _cache_lock = threading.Lock()
 
@@ -40,25 +41,29 @@ def _cached(key: str, fetch: Callable[[], Any]) -> Any:
 
     A fetch that raises requests.RequestException is cached as None for the same
     TTL (negative caching). Never raises.
+
+    The lock is not held during fetch() so a slow Sonarr cannot stall every
+    caller; concurrent misses may fetch twice, which is harmless.
     """
     now = time.time()
     with _cache_lock:
         entry = _cache.get(key)
         if entry and now - entry[0] < SONARR_CACHE_TTL:
             return entry[1]
-        try:
-            value = fetch()
-        except requests.RequestException as e:
-            print(f"Sonarr: lookup '{key}' failed: {e}")
-            value = None
+    try:
+        value = fetch()
+    except requests.RequestException as e:
+        print(f"Sonarr: lookup '{key}' failed: {e}")
+        value = None
+    with _cache_lock:
         _cache[key] = (now, value)
-        return value
+    return value
 
 
 def get_all_series():
     """Fetch all series from Sonarr library."""
     url = f"{SONARR_URL.rstrip('/')}/api/v3/series"
-    response = requests.get(url, headers=_get_headers(), timeout=5)
+    response = requests.get(url, headers=_get_headers(), timeout=LOOKUP_TIMEOUT)
     response.raise_for_status()
     return response.json()
 
@@ -66,7 +71,7 @@ def get_all_series():
 def get_series_episodes(series_id: int) -> list[dict]:
     """Fetch every episode Sonarr knows about for a series (includes hasFile)."""
     url = f"{SONARR_URL.rstrip('/')}/api/v3/episode"
-    response = requests.get(url, headers=_get_headers(), params={"seriesId": series_id}, timeout=5)
+    response = requests.get(url, headers=_get_headers(), params={"seriesId": series_id}, timeout=LOOKUP_TIMEOUT)
     response.raise_for_status()
     return response.json()
 
@@ -78,38 +83,22 @@ def _match_series(series_list: list[dict], show_name: str, override_name: str | 
     Passes, all case-insensitive: exact match on the override name (if any),
     exact match on the original name, then substring match on the override name.
     """
-    search_name = override_name or show_name
-    search_name_lower = search_name.lower()
-    for series in series_list:
-        if series.get("title", "").lower() == search_name_lower:
-            return series.get("id")
+    titles = [(series.get("title", "").lower(), series.get("id")) for series in series_list]
+    search_name = (override_name or show_name).lower()
 
-    # If override was applied but not found, try original name
-    if show_name != search_name:
-        show_name_lower = show_name.lower()
-        for series in series_list:
-            if series.get("title", "").lower() == show_name_lower:
-                return series.get("id")
+    for candidate in dict.fromkeys((search_name, show_name.lower())):
+        for title, series_id in titles:
+            if title == candidate:
+                return series_id
 
-    # Try partial name search
-    for series in series_list:
-        if search_name_lower in series.get("title", "").lower():
-            return series.get("id")
-
+    for title, series_id in titles:
+        if search_name in title:
+            return series_id
     return None
 
 
 def find_series_by_name(show_name: str, override_name: str|None=None) -> int | None:
-    """
-    Find a series ID in Sonarr by show name (uncached; used by the download path).
-
-    Args:
-        show_name: The show name from yt-dlp metadata
-        override_name: Corrected show name to try first, if any
-
-    Returns:
-        Series ID if found, None otherwise
-    """
+    """Uncached series lookup used by the download path."""
     return _match_series(get_all_series(), show_name, override_name)
 
 
@@ -176,7 +165,7 @@ def is_episode_in_library(
         if episode is None:
             return None
         return bool(episode.get("hasFile"))
-    except Exception as e:
+    except (requests.RequestException, ValueError, TypeError, KeyError, AttributeError) as e:
         print(f"Sonarr: episode lookup failed for '{show_name}': {e}")
         return None
 
@@ -236,8 +225,8 @@ def wait_for_command(command_id, timeout: int=30, poll_interval: int=3):
     url = f"{SONARR_URL.rstrip('/')}/api/v3/command/{command_id}"
     terminal = {'completed', 'failed', 'aborted'}
     deadline = time.monotonic() + timeout
-    while time.monotonic() < deadline:
-        response = requests.get(url, headers=_get_headers(), timeout=10)
+    while (remaining := deadline - time.monotonic()) > 0:
+        response = requests.get(url, headers=_get_headers(), timeout=min(10, remaining))
         response.raise_for_status()
         status = response.json().get('status', '')
         if status in terminal:

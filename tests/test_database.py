@@ -137,17 +137,14 @@ class TestReads:
 
 
 class TestSeasonEpisodeNumbers:
-    def test_full_upsert_persists_season_and_episode(self, db):
-        db.upsert_dropout_episode(URL_PATH, URL, 'Show', TITLE, THUMB, DURATION, season_number=6, episode_number=3)
+    @pytest.mark.parametrize('kwargs, expected', [
+        ({'season_number': 6, 'episode_number': 3}, (6, 3)),
+        ({}, (None, None)),
+    ])
+    def test_full_upsert_persists_numbers(self, db, kwargs, expected):
+        db.upsert_dropout_episode(URL_PATH, URL, 'Show', TITLE, THUMB, DURATION, **kwargs)
         row = db.get_dropout_episode(URL_PATH)
-        assert row['season_number'] == 6
-        assert row['episode_number'] == 3
-
-    def test_full_upsert_without_numbers_stores_null(self, db):
-        db.upsert_dropout_episode(URL_PATH, URL, 'Show', TITLE, THUMB, DURATION)
-        row = db.get_dropout_episode(URL_PATH)
-        assert row['season_number'] is None
-        assert row['episode_number'] is None
+        assert (row['season_number'], row['episode_number']) == expected
 
     def test_basic_upsert_leaves_numbers_null(self, db):
         db.upsert_dropout_episode_basic(URL_PATH, URL, TITLE, THUMB, DURATION)

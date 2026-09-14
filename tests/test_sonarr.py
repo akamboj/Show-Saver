@@ -68,20 +68,15 @@ def fake_get(monkeypatch):
 
 
 class TestMatchSeries:
-    def test_exact_match_on_override_name(self):
-        assert sonarr._match_series(SERIES, 'Very Important People', 'Very Important People (2023)') == 2
-
-    def test_exact_match_on_original_when_override_missing(self):
-        assert sonarr._match_series(SERIES, 'Game Changer', 'Game Changer (1999)') == 1
-
-    def test_substring_match(self):
-        assert sonarr._match_series(SERIES, 'Dimension') == 3
-
-    def test_case_insensitive(self):
-        assert sonarr._match_series(SERIES, 'game changer') == 1
-
-    def test_no_match_returns_none(self):
-        assert sonarr._match_series(SERIES, 'Make Some Noise') is None
+    @pytest.mark.parametrize('show_name, override_name, expected', [
+        ('Very Important People', 'Very Important People (2023)', 2),  # exact on override
+        ('Game Changer', 'Game Changer (1999)', 1),                    # override missing, exact on original
+        ('Dimension', None, 3),                                        # substring
+        ('game changer', None, 1),                                     # case-insensitive
+        ('Make Some Noise', None, None),                               # no match
+    ])
+    def test_match(self, show_name, override_name, expected):
+        assert sonarr._match_series(SERIES, show_name, override_name) == expected
 
 
 class TestMatchEpisode:
@@ -108,6 +103,7 @@ class TestMatchEpisode:
         assert ep['id'] == 11
 
 
+@pytest.mark.usefixtures('sonarr_enabled')
 class TestIsEpisodeInLibrary:
     def test_disabled_returns_none(self, monkeypatch, fake_get):
         monkeypatch.setattr(sonarr, 'SONARR_URL', '')
@@ -115,60 +111,58 @@ class TestIsEpisodeInLibrary:
         assert sonarr.is_episode_in_library('Game Changer', None, 6, 3, 'x') is None
         assert fake_get['calls'] == []
 
-    def test_has_file_true(self, sonarr_enabled, fake_get):
-        assert sonarr.is_episode_in_library('Game Changer', None, 6, 3, 'x') is True
+    @pytest.mark.parametrize('episode_number, expected', [(3, True), (4, False)])
+    def test_has_file(self, fake_get, episode_number, expected):
+        assert sonarr.is_episode_in_library('Game Changer', None, 6, episode_number, 'x') is expected
 
-    def test_has_file_false(self, sonarr_enabled, fake_get):
-        assert sonarr.is_episode_in_library('Game Changer', None, 6, 4, 'x') is False
-
-    def test_series_not_found_returns_none(self, sonarr_enabled, fake_get):
+    def test_series_not_found_returns_none(self, fake_get):
         assert sonarr.is_episode_in_library('Make Some Noise', None, 1, 1, 'x') is None
         # Only the series list was fetched
         assert len(fake_get['calls']) == 1
 
-    def test_episode_not_found_returns_none(self, sonarr_enabled, fake_get):
+    def test_episode_not_found_returns_none(self, fake_get):
         assert sonarr.is_episode_in_library('Game Changer', None, 42, 42, 'x') is None
 
-    def test_special_matched_by_title(self, sonarr_enabled, fake_get):
+    def test_special_matched_by_title(self, fake_get):
         assert sonarr.is_episode_in_library('Game Changer', None, 0, 0, "Last Looks - 'Sam'") is True
 
-    def test_series_http_error_returns_none(self, sonarr_enabled, fake_get):
+    def test_series_http_error_returns_none(self, fake_get):
         fake_get['fail_series'] = True
         assert sonarr.is_episode_in_library('Game Changer', None, 6, 3, 'x') is None
 
-    def test_episode_http_error_returns_none(self, sonarr_enabled, fake_get):
+    def test_episode_http_error_returns_none(self, fake_get):
         fake_get['fail_episodes'] = True
         assert sonarr.is_episode_in_library('Game Changer', None, 6, 3, 'x') is None
 
-    def test_second_call_uses_cache(self, sonarr_enabled, fake_get):
+    def test_second_call_uses_cache(self, fake_get):
         sonarr.is_episode_in_library('Game Changer', None, 6, 3, 'x')
         sonarr.is_episode_in_library('Game Changer', None, 6, 4, 'x')
         assert len(fake_get['calls']) == 2  # one series + one episodes fetch
 
-    def test_clear_cache_refetches(self, sonarr_enabled, fake_get):
+    def test_clear_cache_refetches(self, fake_get):
         sonarr.is_episode_in_library('Game Changer', None, 6, 3, 'x')
         sonarr.clear_cache()
         sonarr.is_episode_in_library('Game Changer', None, 6, 3, 'x')
         assert len(fake_get['calls']) == 4
 
-    def test_failure_is_negatively_cached(self, sonarr_enabled, fake_get):
+    def test_failure_is_negatively_cached(self, fake_get):
         fake_get['fail_series'] = True
         sonarr.is_episode_in_library('Game Changer', None, 6, 3, 'x')
         fake_get['fail_series'] = False
         assert sonarr.is_episode_in_library('Game Changer', None, 6, 3, 'x') is None
         assert len(fake_get['calls']) == 1
 
-    def test_cache_expires_after_ttl(self, sonarr_enabled, fake_get, monkeypatch):
+    def test_cache_expires_after_ttl(self, fake_get, monkeypatch):
         clock = {'now': 1000.0}
-        monkeypatch.setattr(sonarr.time, 'time', lambda: clock['now'])
+        monkeypatch.setattr('time.time', lambda: clock['now'])
         sonarr.is_episode_in_library('Game Changer', None, 6, 3, 'x')
         clock['now'] += sonarr.SONARR_CACHE_TTL + 1
         sonarr.is_episode_in_library('Game Changer', None, 6, 3, 'x')
         assert len(fake_get['calls']) == 4
 
-    def test_unexpected_exception_returns_none(self, sonarr_enabled, monkeypatch):
+    def test_malformed_payload_returns_none(self, monkeypatch):
         def _boom(*_a, **_k):
-            raise RuntimeError('unexpected')
+            raise TypeError('malformed')
         monkeypatch.setattr(sonarr, '_cached', _boom)
         assert sonarr.is_episode_in_library('Game Changer', None, 6, 3, 'x') is None
 
@@ -226,14 +220,14 @@ class TestRefreshAndRescanSeries:
     def test_waits_and_clears_cache_without_rename(self, rescan_stubs):
         _prime_cache()
         assert sonarr.refresh_and_rescan_series('Game Changer') is True
-        assert [c[0] for c in rescan_stubs['calls']] == ['find', 'rescan', 'wait']
-        assert ('wait', 99) in rescan_stubs['calls']
+        assert rescan_stubs['calls'] == [('find', 'Game Changer', None), ('rescan', 1), ('wait', 99)]
         assert sonarr._cache == {}
 
     def test_rename_runs_after_wait(self, rescan_stubs):
         assert sonarr.refresh_and_rescan_series('Game Changer', 'Game Changer (2019)', do_rename=True) is True
-        assert [c[0] for c in rescan_stubs['calls']] == ['find', 'rescan', 'wait', 'rename']
-        assert ('rename', (1,)) in rescan_stubs['calls']
+        assert rescan_stubs['calls'] == [
+            ('find', 'Game Changer', 'Game Changer (2019)'), ('rescan', 1), ('wait', 99), ('rename', (1,)),
+        ]
 
     def test_no_command_id_skips_wait_but_still_clears_cache(self, rescan_stubs):
         rescan_stubs['rescan_response'] = {}

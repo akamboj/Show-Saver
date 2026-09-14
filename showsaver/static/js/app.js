@@ -218,9 +218,13 @@ async function updateQueueStatus() {
             if (seenCompletedJobIds === null) {
                 seenCompletedJobIds = completedIds;
             } else {
+                // c.url is the raw submitted text, which queueRelease sends as
+                // card.dataset.url verbatim; the server does not normalize it.
                 const newlyCompleted = data.completed.filter(c => !seenCompletedJobIds.has(c.id));
-                if (newlyCompleted.some(c => hasReleaseCard(c.url))) {
+                if (newlyCompleted.some(c => findReleaseCard(c.url))) {
                     refreshReleaseCards();
+                    // Sonarr's import may lag the rescan wait; try once more.
+                    setTimeout(refreshReleaseCards, RELEASES_BADGE_RETRY_MS);
                 }
                 seenCompletedJobIds = completedIds;
             }
@@ -305,20 +309,23 @@ function formatDuration(seconds) {
     return `${mins}:${secs.toString().padStart(2, '0')}`;
 }
 
-function setInLibraryBadge(card, inLibrary) {
-    const thumbnail = card.querySelector('.release-thumbnail');
-    if (!thumbnail) return;
-    const existing = thumbnail.querySelector('.release-in-library');
+// Find-or-create a badge <span> inside a release thumbnail.
+function ensureBadge(thumbnail, className) {
+    let badge = thumbnail.querySelector(`.${className}`);
+    if (!badge) {
+        badge = makeElement('span', className);
+        thumbnail.appendChild(badge);
+    }
+    return badge;
+}
+
+function setInLibraryBadge(thumbnail, inLibrary) {
     if (inLibrary === true) {
-        card.classList.add('in-library');
-        if (!existing) {
-            const badge = makeElement('span', 'release-in-library', '\u2713');
-            badge.title = 'In Sonarr library';
-            thumbnail.appendChild(badge);
-        }
+        const badge = ensureBadge(thumbnail, 'release-in-library');
+        badge.textContent = '\u2713';
+        badge.title = 'In Sonarr library';
     } else {
-        card.classList.remove('in-library');
-        if (existing) existing.remove();
+        thumbnail.querySelector('.release-in-library')?.remove();
     }
 }
 
@@ -347,7 +354,7 @@ function renderReleases(videos) {
         if (video.duration) {
             thumbnail.appendChild(makeElement('span', 'release-duration', formatDuration(video.duration)));
         }
-        setInLibraryBadge(card, video.in_library);
+        setInLibraryBadge(thumbnail, video.in_library);
 
         info.append(
             makeElement('div', 'release-show', video.show_name || ''),
@@ -370,7 +377,7 @@ async function fetchNewReleases(forceRefresh = false) {
         const data = await response.json();
 
         if (data.success) {
-            const limitedVideos = data.videos.slice(0, 9);
+            const limitedVideos = data.videos.slice(0, RELEASES_MAX_CARDS);
             renderReleases(limitedVideos);
             startReleasesPolling(limitedVideos);
         } else {
@@ -385,8 +392,10 @@ async function fetchNewReleases(forceRefresh = false) {
 }
 
 let releasesPollTimer = null;
+const RELEASES_MAX_CARDS = 9;
 const RELEASES_POLL_INTERVAL_MS = 2000;
 const RELEASES_POLL_MAX = 30;
+const RELEASES_BADGE_RETRY_MS = 10000;
 
 function allCardsSettled(videos) {
     // A card is settled once we have a show_name OR yt-dlp has been tried
@@ -405,43 +414,37 @@ function startReleasesPolling(initialVideos) {
     let polls = 0;
     releasesPollTimer = setInterval(async () => {
         polls += 1;
-        try {
-            const response = await fetch('/dropout/new-releases');
-            const data = await response.json();
-            if (!data.success) return;
-
-            const videos = data.videos.slice(0, 9);
-            videos.forEach(v => updateReleaseCard(v.url, v));
-
-            if (allCardsSettled(videos) || polls >= RELEASES_POLL_MAX) {
-                clearInterval(releasesPollTimer);
-                releasesPollTimer = null;
-            }
-        } catch (err) {
-            console.error('Releases poll failed:', err);
+        const videos = await refreshReleaseCards();
+        if ((videos && allCardsSettled(videos)) || polls >= RELEASES_POLL_MAX) {
+            clearInterval(releasesPollTimer);
+            releasesPollTimer = null;
         }
     }, RELEASES_POLL_INTERVAL_MS);
 }
 
-function hasReleaseCard(url) {
+function findReleaseCard(url) {
     return [...releasesGrid.querySelectorAll('.release-card')]
-        .some(candidate => candidate.dataset.url === url);
+        .find(candidate => candidate.dataset.url === url);
 }
 
+// Re-fetch releases (unforced) and update visible cards in place.
+// Returns the fetched videos, or null on failure.
 async function refreshReleaseCards() {
     try {
         const response = await fetch('/dropout/new-releases');
         const data = await response.json();
-        if (!data.success) return;
-        data.videos.slice(0, 9).forEach(v => updateReleaseCard(v.url, v));
+        if (!data.success) return null;
+        const videos = data.videos.slice(0, RELEASES_MAX_CARDS);
+        videos.forEach(v => updateReleaseCard(v.url, v));
+        return videos;
     } catch (error) {
         console.error('Failed to refresh release cards:', error);
+        return null;
     }
 }
 
 function updateReleaseCard(url, info) {
-    const card = [...releasesGrid.querySelectorAll('.release-card')]
-        .find(candidate => candidate.dataset.url === url);
+    const card = findReleaseCard(url);
     if (!card) return;
 
     // Update thumbnail
@@ -465,17 +468,11 @@ function updateReleaseCard(url, info) {
     // Update duration
     const thumbnailDiv = card.querySelector('.release-thumbnail');
     if (info.duration && thumbnailDiv) {
-        let durationSpan = thumbnailDiv.querySelector('.release-duration');
-        if (!durationSpan) {
-            durationSpan = document.createElement('span');
-            durationSpan.className = 'release-duration';
-            thumbnailDiv.appendChild(durationSpan);
-        }
-        durationSpan.textContent = formatDuration(info.duration);
+        ensureBadge(thumbnailDiv, 'release-duration').textContent = formatDuration(info.duration);
     }
 
     // Update Sonarr library badge
-    setInLibraryBadge(card, info.in_library);
+    if (thumbnailDiv) setInLibraryBadge(thumbnailDiv, info.in_library);
 
     // Mark card as loaded
     card.classList.add('details-loaded');

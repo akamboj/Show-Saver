@@ -165,10 +165,24 @@ class TestProcessInfoDictNoMatch:
         assert info['season_number'] is None
 
 
-class TestFetchAndStoreEpisodeInfo:
-    def test_persists_raw_season_and_episode_numbers(self, monkeypatch):
-        from showsaver.processors import dropout
+class TestProcessDlpOpts:
+    @pytest.mark.parametrize('season_number, expected', [(30, 'S30E'), (None, 'S0E')])
+    def test_dimension_20_template_uses_season_number(self, processor, season_number, expected):
+        info = {'series': 'Dimension 20', 'title': 'Episode', 'season_number': season_number}
+        opts = {}
+        processor.process_dlp_opts(opts, info)
+        assert expected in opts['outtmpl']['default']
+        assert 'SNone' not in opts['outtmpl']['default']
 
+
+@pytest.fixture
+def fake_ydl(monkeypatch):
+    """Patch yt-dlp to return a fixed info dict; returns the kwargs captured by the DB upsert."""
+    from showsaver.processors import dropout
+
+    captured = {}
+
+    def _install(info):
         class _FakeYDL:
             def __init__(self, _opts):
                 pass
@@ -180,24 +194,29 @@ class TestFetchAndStoreEpisodeInfo:
                 return False
 
             def extract_info(self, _url, download=False):
-                return {
-                    'title': 'Some Episode',
-                    'webpage_url': 'https://watch.dropout.tv/videos/some-episode',
-                    'thumbnail': 'https://t/1.jpg',
-                    'duration': 100,
-                    'id': 'abc',
-                    'series': 'Dimension 20',
-                    'season_number': 30,
-                    'episode_number': 5,
-                }
-
-        captured = {}
-
-        def _upsert(**kwargs):
-            captured.update(kwargs)
+                return info
 
         monkeypatch.setattr(dropout.yt_dlp, 'YoutubeDL', _FakeYDL)
-        monkeypatch.setattr(dropout.database, 'upsert_dropout_episode', _upsert)
+        monkeypatch.setattr(dropout.database, 'upsert_dropout_episode', lambda **kw: captured.update(kw))
+        return captured
+
+    return _install
+
+
+class TestFetchAndStoreEpisodeInfo:
+    def test_persists_raw_season_and_episode_numbers(self, fake_ydl):
+        from showsaver.processors import dropout
+
+        captured = fake_ydl({
+            'title': 'Some Episode',
+            'webpage_url': 'https://watch.dropout.tv/videos/some-episode',
+            'thumbnail': 'https://t/1.jpg',
+            'duration': 100,
+            'id': 'abc',
+            'series': 'Dimension 20',
+            'season_number': 30,
+            'episode_number': 5,
+        })
 
         result = dropout.fetch_and_store_episode_info('https://watch.dropout.tv/videos/some-episode')
 
@@ -209,25 +228,10 @@ class TestFetchAndStoreEpisodeInfo:
         assert captured['url_path'] == 'some-episode'
         assert captured['show_name'] == 'Dimension 20'
 
-    def test_missing_numbers_persist_as_none(self, monkeypatch):
+    def test_missing_numbers_persist_as_none(self, fake_ydl):
         from showsaver.processors import dropout
 
-        class _FakeYDL:
-            def __init__(self, _opts):
-                pass
-
-            def __enter__(self):
-                return self
-
-            def __exit__(self, *_exc):
-                return False
-
-            def extract_info(self, _url, download=False):
-                return {'title': 'T', 'webpage_url': 'https://watch.dropout.tv/videos/x', 'series': 'S'}
-
-        captured = {}
-        monkeypatch.setattr(dropout.yt_dlp, 'YoutubeDL', _FakeYDL)
-        monkeypatch.setattr(dropout.database, 'upsert_dropout_episode', lambda **kw: captured.update(kw))
+        captured = fake_ydl({'title': 'T', 'webpage_url': 'https://watch.dropout.tv/videos/x', 'series': 'S'})
 
         dropout.fetch_and_store_episode_info('https://watch.dropout.tv/videos/x')
 

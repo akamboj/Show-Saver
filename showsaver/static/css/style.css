@@ -822,29 +822,29 @@ button {
     transform: scale(1.05);
 }
 
-.release-duration {
+.release-duration,
+.release-in-library {
     position: absolute;
-    bottom: 8px;
     right: 8px;
     background: rgba(0, 0, 0, 0.8);
+    border-radius: 4px;
+}
+
+.release-duration {
+    bottom: 8px;
     color: white;
     font-size: 0.75rem;
     font-weight: 600;
     padding: 0.25rem 0.5rem;
-    border-radius: 4px;
 }
 
 .release-in-library {
-    position: absolute;
     top: 8px;
-    right: 8px;
-    background: rgba(0, 0, 0, 0.8);
     color: var(--accent);
     font-size: 0.85rem;
     font-weight: 700;
     line-height: 1;
     padding: 0.3rem 0.45rem;
-    border-radius: 4px;
 }
 
 .release-info {

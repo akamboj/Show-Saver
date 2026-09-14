@@ -1,3 +1,4 @@
+import pytest
 import yt_dlp
 
 from showsaver.text import normalize_title, title_match_key
@@ -33,16 +34,15 @@ def test_normalize_title_handles_fullwidth_quotes_left_by_ytdlp_filename_sanitiz
 
 
 class TestTitleMatchKey:
-    def test_lowercases_and_strips_punctuation(self):
-        assert title_match_key('Last Looks: "Sam"?') == 'lastlookssam'
+    @pytest.mark.parametrize('title, expected', [
+        ('Last Looks: "Sam"?', 'lastlookssam'),  # lowercased, punctuation stripped
+        ('The  Big - One', 'thebigone'),          # whitespace and hyphens ignored
+        (None, ''),
+        ('', ''),
+    ])
+    def test_key(self, title, expected):
+        assert title_match_key(title) == expected
 
     def test_normalized_and_raw_titles_share_a_key(self):
         raw = 'Last Looks: "Sam"?'
         assert title_match_key(normalize_title(raw)) == title_match_key(raw)
-
-    def test_whitespace_and_hyphens_ignored(self):
-        assert title_match_key('The  Big - One') == 'thebigone'
-
-    def test_none_and_empty_return_empty(self):
-        assert title_match_key(None) == ''
-        assert title_match_key('') == ''

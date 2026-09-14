@@ -54,7 +54,7 @@ class DropoutProcessor(Processor):
             dlp_opts['outtmpl'] = {'default' : '%(series)s - S00E00 - %(title)s WEBDL-1080p.%(ext)s'}
         elif self.__is_dim20(info_dict) or self.__is_adventuring_party(info_dict):
             # Because of the season number modification we have to specify it directly in the file name template
-            season_number = info_dict.get('season_number', 0)
+            season_number = info_dict.get('season_number') or 0
             dlp_opts['outtmpl'] = {'default' : f'%(series)s - S{season_number}E%(episode_number)02d - %(title)s WEBDL-1080p.%(ext)s'}
 
 
@@ -183,20 +183,13 @@ def _update_database_episode(video_info: dict) -> None:
     )
 
 
-def _annotate_in_library(video: dict) -> None:
-    """
-    Set video['in_library'] from Sonarr: True/False if the episode could be
-    matched, None if the show is unknown, Sonarr is disabled, or lookup failed.
-
-    Season/episode numbers are stored raw from yt-dlp and remapped here via the
-    processor so the Dimension 20 offsets / specials rules stay in one place.
-    """
+def _annotate_in_library(video: dict, processor: DropoutProcessor) -> None:
+    """Set video['in_library'] via Sonarr after applying the processor's season/episode remaps."""
     show_name = video.get('show_name') or ''
     if not show_name:
         video['in_library'] = None
         return
 
-    processor = DropoutProcessor()
     info = {
         'series': show_name,
         'title': video.get('title') or '',
@@ -221,11 +214,12 @@ def get_new_releases(force_refresh: bool=False):
     if force_refresh:
         sonarr.clear_cache()
 
+    processor = DropoutProcessor()
     if not force_refresh and _new_releases_cache['data'] and (time.time() - _new_releases_cache['timestamp'] < CACHE_TTL):
         fetched = [row for row in (database.get_dropout_episode(_get_url_path(u)) for u in _new_releases_cache['data']) if row]
         if fetched:
             for video in fetched:
-                _annotate_in_library(video)
+                _annotate_in_library(video, processor)
             return {'success': True, 'videos': fetched, 'cached': True}
     
     try:
@@ -250,7 +244,7 @@ def get_new_releases(force_refresh: bool=False):
                 'season_number': row.get('season_number'),
                 'episode_number': row.get('episode_number'),
             }
-            _annotate_in_library(merged)
+            _annotate_in_library(merged, processor)
             videos.append(merged)
 
             if not merged['show_name'] and (time.time() - (metadata_fetched_at or 0)) > METADATA_CACHE_TTL:

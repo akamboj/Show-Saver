@@ -105,11 +105,16 @@ class TestApiPayload:
         assert result['videos'][0]['metadata_fetched_at'] is None
 
 
+def _row(**overrides):
+    """A fully-fetched Game Changer S06E03 DB row, with optional field overrides."""
+    return {'show_name': 'Game Changer', 'metadata_fetched_at': time.time(),
+            'season_number': 6, 'episode_number': 3, **overrides}
+
+
 class TestInLibraryAnnotation:
     @pytest.mark.parametrize('flag', [True, False, None])
     def test_in_library_propagates_from_sonarr(self, mock_releases, flag):
-        mock_releases['db_row'] = {'show_name': 'Game Changer', 'metadata_fetched_at': time.time(),
-                                   'season_number': 6, 'episode_number': 3}
+        mock_releases['db_row'] = _row()
         mock_releases['in_library'] = flag
         result = dropout.get_new_releases(force_refresh=True)
         assert result['videos'][0]['in_library'] is flag
@@ -121,15 +126,13 @@ class TestInLibraryAnnotation:
         assert mock_releases['sonarr_calls'] == []
 
     def test_season_and_episode_numbers_are_exposed(self, mock_releases):
-        mock_releases['db_row'] = {'show_name': 'Game Changer', 'metadata_fetched_at': time.time(),
-                                   'season_number': 6, 'episode_number': 3}
+        mock_releases['db_row'] = _row()
         result = dropout.get_new_releases(force_refresh=True)
         assert result['videos'][0]['season_number'] == 6
         assert result['videos'][0]['episode_number'] == 3
 
     def test_dimension_20_season_is_remapped_before_lookup(self, mock_releases):
-        mock_releases['db_row'] = {'show_name': 'Dimension 20', 'metadata_fetched_at': time.time(),
-                                   'season_number': 30, 'episode_number': 5}
+        mock_releases['db_row'] = _row(show_name='Dimension 20', season_number=30, episode_number=5)
         dropout.get_new_releases(force_refresh=True)
         call = mock_releases['sonarr_calls'][0]
         assert call['show_name'] == 'Dimension 20'
@@ -138,27 +141,21 @@ class TestInLibraryAnnotation:
 
     def test_special_is_zeroed_and_override_applied(self, mock_releases):
         mock_releases['scraped'][0]['title'] = 'Last Looks: Someone'
-        mock_releases['db_row'] = {'show_name': 'Very Important People', 'metadata_fetched_at': time.time(),
-                                   'season_number': 3, 'episode_number': 7}
+        mock_releases['db_row'] = _row(show_name='Very Important People', season_number=3, episode_number=7)
         dropout.get_new_releases(force_refresh=True)
         call = mock_releases['sonarr_calls'][0]
         assert call['override_name'] == 'Very Important People (2023)'
         assert (call['season_number'], call['episode_number']) == (0, 0)
         assert call['title'] == 'Last Looks: Someone'
 
-    def test_null_season_number_does_not_crash(self, mock_releases):
-        mock_releases['db_row'] = {'show_name': 'Dimension 20', 'metadata_fetched_at': time.time(),
-                                   'season_number': None, 'episode_number': None}
-        result = dropout.get_new_releases(force_refresh=True)
-        assert result['success'] is True
-        # Unknown numbers pass through as None so Sonarr matching falls back to title
+    def test_null_numbers_pass_through_for_title_fallback(self, mock_releases):
+        mock_releases['db_row'] = _row(show_name='Dimension 20', season_number=None, episode_number=None)
+        dropout.get_new_releases(force_refresh=True)
         call = mock_releases['sonarr_calls'][0]
-        assert call['season_number'] is None
-        assert call['episode_number'] is None
+        assert (call['season_number'], call['episode_number']) == (None, None)
 
     def test_cached_path_is_annotated(self, mock_releases):
-        mock_releases['db_row'] = {'url': 'https://watch.dropout.tv/videos/ep-one', 'show_name': 'Game Changer',
-                                   'metadata_fetched_at': time.time(), 'season_number': 6, 'episode_number': 3}
+        mock_releases['db_row'] = _row(url='https://watch.dropout.tv/videos/ep-one')
         mock_releases['in_library'] = True
         dropout._new_releases_cache['data'] = ['https://watch.dropout.tv/videos/ep-one']
         dropout._new_releases_cache['timestamp'] = time.time()
