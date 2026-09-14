@@ -181,3 +181,89 @@ class TestFindSeriesByName:
 
     def test_override_then_original(self, sonarr_enabled, fake_get):
         assert sonarr.find_series_by_name('Very Important People', 'Very Important People (2023)') == 2
+
+
+@pytest.fixture
+def rescan_stubs(monkeypatch, sonarr_enabled):
+    """Stub the command endpoints used by refresh_and_rescan_series and record calls."""
+    state = {
+        'series_id': 1,
+        'rescan_response': {'id': 99},
+        'wait_status': 'completed',
+        'calls': [],
+    }
+
+    def _find(show_name, override_name=None):
+        state['calls'].append(('find', show_name, override_name))
+        return state['series_id']
+
+    def _rescan(series_id):
+        state['calls'].append(('rescan', series_id))
+        return state['rescan_response']
+
+    def _wait(command_id, timeout=30, poll_interval=3):
+        state['calls'].append(('wait', command_id))
+        return state['wait_status']
+
+    def _rename(series_ids):
+        state['calls'].append(('rename', tuple(series_ids)))
+        return {'id': 100}
+
+    monkeypatch.setattr(sonarr, 'find_series_by_name', _find)
+    monkeypatch.setattr(sonarr, 'rescan_series', _rescan)
+    monkeypatch.setattr(sonarr, 'wait_for_command', _wait)
+    monkeypatch.setattr(sonarr, 'rename_series', _rename)
+    return state
+
+
+def _prime_cache():
+    with sonarr._cache_lock:
+        sonarr._cache['series'] = (sonarr.time.time(), SERIES)
+        sonarr._cache['episodes:1'] = (sonarr.time.time(), EPISODES_GAME_CHANGER)
+
+
+class TestRefreshAndRescanSeries:
+    def test_waits_and_clears_cache_without_rename(self, rescan_stubs):
+        _prime_cache()
+        assert sonarr.refresh_and_rescan_series('Game Changer') is True
+        assert [c[0] for c in rescan_stubs['calls']] == ['find', 'rescan', 'wait']
+        assert ('wait', 99) in rescan_stubs['calls']
+        assert sonarr._cache == {}
+
+    def test_rename_runs_after_wait(self, rescan_stubs):
+        assert sonarr.refresh_and_rescan_series('Game Changer', 'Game Changer (2019)', do_rename=True) is True
+        assert [c[0] for c in rescan_stubs['calls']] == ['find', 'rescan', 'wait', 'rename']
+        assert ('rename', (1,)) in rescan_stubs['calls']
+
+    def test_no_command_id_skips_wait_but_still_clears_cache(self, rescan_stubs):
+        rescan_stubs['rescan_response'] = {}
+        _prime_cache()
+        assert sonarr.refresh_and_rescan_series('Game Changer') is True
+        assert [c[0] for c in rescan_stubs['calls']] == ['find', 'rescan']
+        assert sonarr._cache == {}
+
+    def test_timeout_still_clears_cache(self, rescan_stubs):
+        rescan_stubs['wait_status'] = 'timeout'
+        _prime_cache()
+        assert sonarr.refresh_and_rescan_series('Game Changer') is True
+        assert sonarr._cache == {}
+
+    def test_series_not_found_returns_false_and_keeps_cache(self, rescan_stubs):
+        rescan_stubs['series_id'] = None
+        _prime_cache()
+        assert sonarr.refresh_and_rescan_series('Nope') is False
+        assert [c[0] for c in rescan_stubs['calls']] == ['find']
+        assert 'series' in sonarr._cache
+
+    def test_disabled_returns_false(self, rescan_stubs, monkeypatch):
+        monkeypatch.setattr(sonarr, 'SONARR_URL', '')
+        assert sonarr.refresh_and_rescan_series('Game Changer') is False
+        assert rescan_stubs['calls'] == []
+
+    def test_wait_http_error_still_clears_cache(self, rescan_stubs, monkeypatch):
+        def _boom(command_id, timeout=30, poll_interval=3):
+            raise requests.ConnectionError('down')
+        monkeypatch.setattr(sonarr, 'wait_for_command', _boom)
+        _prime_cache()
+        assert sonarr.refresh_and_rescan_series('Game Changer') is True
+        assert sonarr._cache == {}

@@ -101,7 +101,7 @@ Episode metadata for Dropout releases is cached in SQLite at `DB_PATH` (default 
 - **`in_library` field:** each video in `/dropout/new-releases` carries `in_library`: `true` if Sonarr has a file for the episode, `false` if Sonarr knows the episode but has no file, `null` if the show name is not resolved yet, Sonarr is disabled, the series/episode could not be matched, or the lookup failed. Computed on every request via `sonarr.is_episode_in_library()` (cached, never raises). The frontend shows a ✓ badge on the card when `true`.
 - **Scrape path:** `/dropout/new-releases` triggers `get_new_releases()`, which scrapes the public HTML, upserts scrape-time fields via `upsert_dropout_episode_basic()` (preserves any existing `show_name`), and enqueues a background `metadata_worker` job for any row still missing `show_name`.
 - **Worker:** `metadata_worker` (started in `main.py`) runs yt-dlp per URL and calls `upsert_dropout_episode()` with the full row. `metadata_in_flight` (guarded by `thread_lock`) dedups concurrent enqueues.
-- **Frontend polling:** `app.js` polls `/dropout/new-releases` every 2 s (up to 30 polls) until every card has a `show_name`. The refresh button calls `?refresh=true`, which bypasses the scrape cache and clears the Sonarr cache.
+- **Frontend polling:** `app.js` polls `/dropout/new-releases` every 2 s (up to 30 polls) until every card has a `show_name`. The refresh button calls `?refresh=true`, which bypasses the scrape cache and clears the Sonarr cache. The 1 s `/queue` poller also re-fetches `/dropout/new-releases` once (unforced) whenever a job whose URL matches a visible release card reaches `completed`, so the ✓ badge appears without a manual refresh.
 - **Concurrency:** WAL journal mode + `busy_timeout=5000` are set in `init_db()` so the download worker, metadata worker, and request threads can write concurrently.
 - **In-memory scrape cache:** `_new_releases_cache` holds a URL list with a 5-minute TTL to avoid re-scraping on every poll; the DB is the source of truth for metadata.
 - **Reset:** `bash scripts/reset_db.sh` deletes the local dev DB (`./.local/config/showsaver.db`).
@@ -129,7 +129,7 @@ Uses `.netrc` file in `CONFIG_DIR` for site credentials. The `netrc_location` is
 ### Sonarr Integration
 Optional integration that triggers a series rescan (and optionally rename) in Sonarr after downloading. Configure `SONARR_URL` and `SONARR_API_KEY` to enable.
 - Non-blocking: Sonarr failures are logged as warnings but never cause downloads to fail
-- Waits for rescan to complete before triggering rename (prevents race conditions)
+- Always waits for the rescan command to finish (bounded by `wait_for_command`, 30 s) and then calls `clear_cache()`, so by the time the download job is marked completed an `in_library` lookup sees the imported file. Rename, when needed, is triggered after that wait.
 - Rename is only triggered when the processor's `should_trigger_rename()` returns `True`
 
 **Episode presence lookup** (`is_episode_in_library(show_name, override_name, season_number, episode_number, title)`):

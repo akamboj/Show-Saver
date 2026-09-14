@@ -28,6 +28,7 @@ activityOverlay.addEventListener('click', closePanel);
 let connectionLost = false;
 let prevDownloadingIds = new Set();
 let pendingJob = null;
+let seenCompletedJobIds = null; // null until the first /queue poll has been processed
 const connectionToast = document.getElementById('connectionError');
 const SAFE_STATUS_CLASSES = new Set(['pending', 'queued', 'downloading', 'completed', 'failed']);
 const PLACEHOLDER_THUMB = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 320 180'%3E%3Crect fill='%232a2a2a' width='320' height='180'/%3E%3Crect x='100' y='45' width='120' height='75' rx='4' fill='none' stroke='%23555' stroke-width='4'/%3E%3Crect x='110' y='55' width='100' height='55' fill='%23333'/%3E%3Crect x='140' y='120' width='40' height='8' fill='%23555'/%3E%3Crect x='130' y='128' width='60' height='6' rx='2' fill='%23555'/%3E%3C/svg%3E";
@@ -210,6 +211,19 @@ async function updateQueueStatus() {
                 openPanel();
             }
             prevDownloadingIds = currentIds;
+
+            // When a download for a visible release card finishes, re-fetch the
+            // releases once so the "in library" badge reflects the new file.
+            const completedIds = new Set(data.completed.map(c => c.id));
+            if (seenCompletedJobIds === null) {
+                seenCompletedJobIds = completedIds;
+            } else {
+                const newlyCompleted = data.completed.filter(c => !seenCompletedJobIds.has(c.id));
+                if (newlyCompleted.some(c => hasReleaseCard(c.url))) {
+                    refreshReleaseCards();
+                }
+                seenCompletedJobIds = completedIds;
+            }
         }
     } catch (error) {
         console.error('Failed to update queue status:', error);
@@ -407,6 +421,22 @@ function startReleasesPolling(initialVideos) {
             console.error('Releases poll failed:', err);
         }
     }, RELEASES_POLL_INTERVAL_MS);
+}
+
+function hasReleaseCard(url) {
+    return [...releasesGrid.querySelectorAll('.release-card')]
+        .some(candidate => candidate.dataset.url === url);
+}
+
+async function refreshReleaseCards() {
+    try {
+        const response = await fetch('/dropout/new-releases');
+        const data = await response.json();
+        if (!data.success) return;
+        data.videos.slice(0, 9).forEach(v => updateReleaseCard(v.url, v));
+    } catch (error) {
+        console.error('Failed to refresh release cards:', error);
+    }
 }
 
 function updateReleaseCard(url, info) {

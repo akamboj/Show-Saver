@@ -248,11 +248,12 @@ def wait_for_command(command_id, timeout: int=30, poll_interval: int=3):
 
 def refresh_and_rescan_series(show_name: str, override_name: str|None=None, do_rename: bool=False) -> bool:
     """
-    Main entry point: find series and trigger rescan.
+    Main entry point: find series, trigger rescan, wait for it, refresh the lookup cache.
 
     Args:
         show_name: The show name from yt-dlp metadata
         override_name: Potential overriden name of show
+        do_rename: Also trigger a RenameSeries after the rescan finishes
 
     Returns:
         True if rescan was triggered, False otherwise
@@ -270,9 +271,15 @@ def refresh_and_rescan_series(show_name: str, override_name: str|None=None, do_r
     command_id = rescan_ret.get('id')
     print(f"Sonarr: Triggered rescan for series '{show_name}' (ID: {series_id})")
 
-    if command_id and do_rename:
-        final_status = wait_for_command(command_id)
-        print(f"Sonarr: Rescan finished with status '{final_status}' for '{show_name}'")
+    if command_id:
+        try:
+            final_status = wait_for_command(command_id)
+            print(f"Sonarr: Rescan finished with status '{final_status}' for '{show_name}'")
+        except requests.RequestException as e:
+            print(f"Sonarr: Could not confirm rescan completion for '{show_name}': {e}")
+
+    # Drop cached series/episode lists so in_library lookups see the imported file
+    clear_cache()
 
     if do_rename:
         rename_series([series_id])
