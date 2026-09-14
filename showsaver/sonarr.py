@@ -13,6 +13,7 @@ from showsaver.text import title_match_key
 SONARR_CACHE_TTL = 60  # seconds
 LOOKUP_TIMEOUT = 5  # seconds; read-only lookups must stay short since the frontend polls them
 _cache: dict[str, tuple[float, Any]] = {}
+_cache_gen = 0  # bumped by clear_cache() so in-flight fetches don't resurrect stale data
 _cache_lock = threading.Lock()
 
 
@@ -30,9 +31,11 @@ def _get_headers() -> dict[str, str]:
 
 
 def clear_cache() -> None:
-    """Drop all cached Sonarr lookups."""
+    """Drop all cached Sonarr lookups, including the result of any fetch in flight."""
+    global _cache_gen
     with _cache_lock:
         _cache.clear()
+        _cache_gen += 1
 
 
 def _cached(key: str, fetch: Callable[[], Any]) -> Any:
@@ -43,20 +46,24 @@ def _cached(key: str, fetch: Callable[[], Any]) -> Any:
     TTL (negative caching). Never raises.
 
     The lock is not held during fetch() so a slow Sonarr cannot stall every
-    caller; concurrent misses may fetch twice, which is harmless.
+    caller; concurrent misses may fetch twice, which is harmless. If
+    clear_cache() runs while a fetch is in flight, that fetch's result is
+    returned but not stored, so a pre-import snapshot can't outlive the clear.
     """
     now = time.time()
     with _cache_lock:
         entry = _cache.get(key)
         if entry and now - entry[0] < SONARR_CACHE_TTL:
             return entry[1]
+        gen = _cache_gen
     try:
         value = fetch()
     except requests.RequestException as e:
         print(f"Sonarr: lookup '{key}' failed: {e}")
         value = None
     with _cache_lock:
-        _cache[key] = (now, value)
+        if _cache_gen == gen:
+            _cache[key] = (now, value)
     return value
 
 
@@ -165,7 +172,7 @@ def is_episode_in_library(
         if episode is None:
             return None
         return bool(episode.get("hasFile"))
-    except (requests.RequestException, ValueError, TypeError, KeyError, AttributeError) as e:
+    except Exception as e:
         print(f"Sonarr: episode lookup failed for '{show_name}': {e}")
         return None
 
@@ -220,18 +227,21 @@ def wait_for_command(command_id, timeout: int=30, poll_interval: int=3):
         poll_interval: Seconds between polls (default 3)
 
     Returns:
-        Final status string, e.g. 'completed', 'failed', 'aborted'
+        Final status string ('completed', 'failed', 'aborted'), or 'timeout'
+        if no terminal status was seen within `timeout` seconds total.
     """
     url = f"{SONARR_URL.rstrip('/')}/api/v3/command/{command_id}"
     terminal = {'completed', 'failed', 'aborted'}
     deadline = time.monotonic() + timeout
-    while (remaining := deadline - time.monotonic()) > 0:
+    # Each poll's request timeout and the sleep are clamped to the remaining
+    # budget; a poll with under a second left is skipped rather than raising.
+    while (remaining := deadline - time.monotonic()) >= 1:
         response = requests.get(url, headers=_get_headers(), timeout=min(10, remaining))
         response.raise_for_status()
         status = response.json().get('status', '')
         if status in terminal:
             return status
-        time.sleep(poll_interval)
+        time.sleep(min(poll_interval, max(0, deadline - time.monotonic())))
     return 'timeout'
 
 

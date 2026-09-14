@@ -160,11 +160,51 @@ class TestIsEpisodeInLibrary:
         sonarr.is_episode_in_library('Game Changer', None, 6, 3, 'x')
         assert len(fake_get['calls']) == 4
 
-    def test_malformed_payload_returns_none(self, monkeypatch):
+    def test_malformed_series_payload_returns_none(self, fake_get):
+        fake_get['series'] = [{'title': None, 'id': 1}]
+        assert sonarr.is_episode_in_library('Game Changer', None, 6, 3, 'x') is None
+
+    def test_unexpected_exception_returns_none(self, monkeypatch):
         def _boom(*_a, **_k):
-            raise TypeError('malformed')
+            raise RuntimeError('unexpected')
         monkeypatch.setattr(sonarr, '_cached', _boom)
         assert sonarr.is_episode_in_library('Game Changer', None, 6, 3, 'x') is None
+
+    def test_clear_during_inflight_fetch_is_not_resurrected(self):
+        # Simulates the download worker clearing the cache while a request
+        # thread is mid-fetch: the value is returned but must not be stored.
+        def _fetch():
+            sonarr.clear_cache()
+            return ['stale']
+        assert sonarr._cached('series', _fetch) == ['stale']
+        assert sonarr._cache == {}
+        assert sonarr._cached('series', lambda: ['fresh']) == ['fresh']
+        assert sonarr._cache['series'][1] == ['fresh']
+
+
+class TestWaitForCommand:
+    def test_timeout_is_bounded_and_never_raises(self, sonarr_enabled, monkeypatch):
+        clock = {'now': 0.0}
+        timeouts = []
+        monkeypatch.setattr('time.monotonic', lambda: clock['now'])
+        monkeypatch.setattr('time.sleep', lambda s: clock.__setitem__('now', clock['now'] + s))
+
+        def _get(url, headers=None, params=None, timeout=None):
+            timeouts.append(timeout)
+            clock['now'] += 2  # each poll takes 2 s of wall time
+            return _Resp({'status': 'started'})
+        monkeypatch.setattr(sonarr.requests, 'get', _get)
+
+        assert sonarr.wait_for_command(99, timeout=30, poll_interval=3) == 'timeout'
+        assert clock['now'] <= 30
+        assert timeouts and all(1 <= t <= 10 for t in timeouts)
+
+    def test_returns_terminal_status(self, sonarr_enabled, monkeypatch):
+        statuses = iter(['queued', 'started', 'completed'])
+        monkeypatch.setattr('time.sleep', lambda _s: None)
+        monkeypatch.setattr(sonarr.requests, 'get',
+                            lambda url, headers=None, params=None, timeout=None: _Resp({'status': next(statuses)}))
+        assert sonarr.wait_for_command(99) == 'completed'
 
 
 class TestFindSeriesByName:
