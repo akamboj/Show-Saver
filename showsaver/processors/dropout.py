@@ -101,7 +101,12 @@ class DropoutProcessor(Processor):
         
         url = f'{D20_COMPLETE_SERIES_URL}/season:{season}/videos/{slug}'
         print(f'Found corrected url: {url}')
-        return url, get_metadata(url)
+        corrected_info = get_metadata(url)
+        if not corrected_info.get('season_number'):
+            # Season numbers past the real range resolve to the season-less page
+            print(f'Corrected url did not resolve to a season: {url}')
+            return None
+        return url, corrected_info
 
 
     def treat_as_special(self, info_dict) -> bool:
@@ -216,12 +221,14 @@ def _get_d20_season_map(force_refresh: bool = False) -> dict[str, int]:
 
 def _probe_d20_season(slug: str, max_season: int) -> int | None:
     """
-    Fallback for episodes the sitemap has not picked up yet: HEAD the complete-series
-    Loop through seasons
-    https://watch.dropout.tv/dimension-20-the-complete-series/season:28/videos/poppy-persona-non-grata
-    https://watch.dropout.tv/videos/poppy-persona-non-grata
+    Fallback for episodes the sitemap has not picked up yet: HEAD the complete-series url
+    for each season the sitemap knows about, newest first.
+    Season numbers above the real range return 200 for any slug
+    (the site serves the season-less page), so they must never be probed.
+    e.g. https://watch.dropout.tv/videos/poppy-persona-non-grata
+      -> https://watch.dropout.tv/dimension-20-the-complete-series/season:28/videos/poppy-persona-non-grata
     """
-    for season in range(1, max_season):
+    for season in range(max_season, 0, -1):
         url = f'{D20_COMPLETE_SERIES_URL}/season:{season}/videos/{slug}'
         try:
             print(f'Trying url: {url}')
