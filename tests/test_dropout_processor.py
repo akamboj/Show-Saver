@@ -1,5 +1,6 @@
 import pytest
 
+import showsaver.processors.dropout as dropout
 from showsaver.processors.dropout import DropoutProcessor
 
 
@@ -159,9 +160,6 @@ class TestProcessInfoDictNoMatch:
 # Dimension 20 url correction
 # ---------------------------------------------------------------------------
 
-import showsaver.processors.dropout as dropout
-
-
 class _Resp:
     def __init__(self, status_code=200, text=''):
         self.status_code = status_code
@@ -215,20 +213,30 @@ class TestGetD20SeasonMap:
         monkeypatch.setattr(dropout.requests, 'get', boom)
         assert dropout._get_d20_season_map(force_refresh=True) == stale
 
+    def test_unparseable_sitemap_keeps_cached_map(self, monkeypatch):
+        # A 200 that yields no entries means the sitemap changed shape, not that the
+        # collection emptied -- it must not clobber a good map.
+        monkeypatch.setattr(dropout.requests, 'get', lambda *a, **k: _Resp(200, SITEMAP_SNIPPET))
+        good = dropout._get_d20_season_map()
 
-class TestProbeD20Season:
-    def test_probes_newest_known_season_first_and_stops_on_hit(self, monkeypatch):
-        # Seasons above the known range return 200 for any slug, so the probe must
-        # start at max_season (never above it) and stop at the first non-404.
-        seen = []
+        monkeypatch.setattr(dropout.requests, 'get', lambda *a, **k: _Resp(200, '<urlset></urlset>'))
+        assert dropout._get_d20_season_map(force_refresh=True) == good
+        assert dropout._d20_season_cache['data'] == good
 
-        def head(url, **kwargs):
-            seen.append(int(url.rsplit('season:', 1)[1].split('/')[0]))
-            return _Resp(200 if 'season:30/' in url else 404)
-        monkeypatch.setattr(dropout.requests, 'head', head)
+    def test_empty_map_is_negatively_cached(self, monkeypatch):
+        # An empty map is falsy, so a truthiness check on the cache would re-download
+        # the ~1.4 MB sitemap on every single call.
+        calls = []
 
-        assert dropout._probe_d20_season('some-slug', 31) == 30
-        assert seen == [31, 30]
+        def get(*a, **k):
+            calls.append(a)
+            return _Resp(200, '<urlset></urlset>')
+        monkeypatch.setattr(dropout.requests, 'get', get)
+
+        dropout._d20_season_cache['data'] = {}
+        dropout._d20_season_cache['timestamp'] = dropout.time.time()
+        assert dropout._get_d20_season_map() == {}
+        assert calls == []
 
 
 @pytest.mark.usefixtures('reset_d20_cache')
@@ -236,7 +244,6 @@ class TestFindCorrectedUrl:
     @pytest.fixture(autouse=True)
     def no_network(self, monkeypatch):
         monkeypatch.setattr(dropout.requests, 'get', _fail)
-        monkeypatch.setattr(dropout.requests, 'head', _fail)
 
     @pytest.fixture
     def metadata_calls(self, monkeypatch):
@@ -251,23 +258,57 @@ class TestFindCorrectedUrl:
 
     def test_uses_sitemap_map(self, processor, monkeypatch, metadata_calls):
         monkeypatch.setattr(dropout, '_get_d20_season_map', lambda **k: {'poppy-persona-non-grata': 28})
-        monkeypatch.setattr(dropout, '_probe_d20_season', _fail)
 
         result = processor.find_corrected_url(D20_URL, {'series': 'Dimension 20: Gladlands'})
 
         assert result == (CORRECTED_URL, {'series': 'Dimension 20', 'season_number': 28})
         assert metadata_calls == [CORRECTED_URL]
 
-    def test_falls_back_to_probe_when_slug_missing(self, processor, monkeypatch, metadata_calls):
-        monkeypatch.setattr(dropout, '_get_d20_season_map', lambda **k: {'other': 31})
-        probe_calls = []
-        monkeypatch.setattr(dropout, '_probe_d20_season',
-                            lambda slug, max_season: probe_calls.append((slug, max_season)) or 30)
+    def test_refreshes_sitemap_once_when_slug_missing(self, processor, monkeypatch, metadata_calls):
+        # A stale map is the likeliest reason for a miss, so one forced refresh should
+        # find a newly published episode -- with no url probing of any kind.
+        map_calls = []
+
+        def season_map(force_refresh=False):
+            map_calls.append(force_refresh)
+            return {'poppy-persona-non-grata': 28} if force_refresh else {'other': 31}
+        monkeypatch.setattr(dropout, '_get_d20_season_map', season_map)
 
         result = processor.find_corrected_url(D20_URL, {'series': 'Dimension 20: Gladlands'})
 
-        assert probe_calls == [('poppy-persona-non-grata', 31)]
-        assert result[0] == CORRECTED_URL.replace('season:28', 'season:30')
+        assert map_calls == [False, True]
+        assert result == (CORRECTED_URL, {'series': 'Dimension 20', 'season_number': 28})
+
+    def test_returns_none_when_slug_missing_after_refresh(self, processor, monkeypatch):
+        monkeypatch.setattr(dropout, 'get_metadata', _fail)
+        monkeypatch.setattr(dropout, '_get_d20_season_map', lambda **k: {'other': 31})
+
+        assert processor.find_corrected_url(D20_URL, {'series': 'Dimension 20: Gladlands'}) is None
+
+    def test_empty_season_map_returns_none_without_probing(self, processor, monkeypatch):
+        # Regression: an empty map used to seed a probe at season 40, which the site
+        # answers 200 for any slug. There is no safe upper bound, so never guess.
+        monkeypatch.setattr(dropout, 'get_metadata', _fail)
+        monkeypatch.setattr(dropout, '_get_d20_season_map', lambda **k: {})
+
+        assert processor.find_corrected_url(D20_URL, {'series': 'Dimension 20: Gladlands'}) is None
+
+    def test_metadata_failure_falls_back_to_original_url(self, processor, monkeypatch):
+        # The original url is known to work; a corrected url we cannot read must not
+        # take the whole download job down with it.
+        monkeypatch.setattr(dropout, '_get_d20_season_map', lambda **k: {'poppy-persona-non-grata': 28})
+
+        def boom(url):
+            raise RuntimeError('ERROR: unable to extract video data')
+        monkeypatch.setattr(dropout, 'get_metadata', boom)
+
+        assert processor.find_corrected_url(D20_URL, {'series': 'Dimension 20: Gladlands'}) is None
+
+    def test_metadata_returning_none_returns_none(self, processor, monkeypatch):
+        monkeypatch.setattr(dropout, '_get_d20_season_map', lambda **k: {'poppy-persona-non-grata': 28})
+        monkeypatch.setattr(dropout, 'get_metadata', lambda url: None)
+
+        assert processor.find_corrected_url(D20_URL, {'series': 'Dimension 20: Gladlands'}) is None
 
     def test_rejects_metadata_without_season_number(self, processor, monkeypatch):
         monkeypatch.setattr(dropout, '_get_d20_season_map', lambda **k: {'poppy-persona-non-grata': 28})

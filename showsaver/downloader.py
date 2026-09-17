@@ -111,7 +111,7 @@ BASE_YT_OPTS = {
 
 
 # the info file has the show name and season number, we need these for building the destination path on the server
-def get_metadata(show_url: str) -> dict:
+def get_metadata(show_url: str) -> dict | None:
     dlp_opts = {
         **BASE_YT_OPTS,
         'skip_download' : True,
@@ -235,18 +235,6 @@ def copy_to_destination(
     print("Copy complete!")
 
 
-def process_urls(url_list: list[str], desired_destination: PathLike) -> None:
-    print('********** Processing Urls: **********')
-    if len(url_list) > 0:
-        for url in url_list:
-            print(url)
-
-        for url in url_list:
-            process_url(url, desired_destination)
-    else:
-        print("No initial Urls provided.")
-
-
 def process_url(
     show_url: str,
     desired_destination: PathLike,
@@ -263,8 +251,6 @@ def process_url(
         corrected = processor.find_corrected_url(show_url, info_dict)
         if corrected:
             show_url, info_dict = corrected
-
-    if processor:
         processor.process_info_dict(info_dict)
 
     show_path = download_show(show_url, info_dict, progress_callback, processor)
