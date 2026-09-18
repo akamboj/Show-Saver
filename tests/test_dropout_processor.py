@@ -1,12 +1,11 @@
 import pytest
 
 import showsaver.processors.dropout as dropout
-from showsaver.processors.dropout import DropoutProcessor
 
 
 @pytest.fixture
 def processor():
-    return DropoutProcessor()
+    return dropout.DropoutProcessor()
 
 
 class TestProcessInfoDictLastLooks:
