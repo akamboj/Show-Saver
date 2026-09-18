@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.5.3](https://github.com/akamboj/Show-Saver/compare/v0.5.2...v0.5.3) (2026-09-18)
+
+
+### Bug Fixes
+
+* Fix d20 url mapping to full series ([#69](https://github.com/akamboj/Show-Saver/issues/69)) ([bc97bb2](https://github.com/akamboj/Show-Saver/commit/bc97bb23ba623387e61d9c0598d2d20330eb91f0))
+
 ## [0.5.2](https://github.com/akamboj/Show-Saver/compare/v0.5.1...v0.5.2) (2026-09-05)
 
 
