@@ -91,6 +91,7 @@ Processors customize download behavior per content source. `DropoutProcessor` (i
 - `process_dlp_opts()` — customizes output template for special episodes
 - `process_show_name()` — applies show name overrides (e.g., `'Very Important People'` → `'Very Important People (2023)'`)
 - `should_trigger_rename()` — returns `True` for episodes that need Sonarr rename
+- `find_corrected_url()` — returns `(url, info_dict)` when a source-specific url rewrite applies, or `None` to keep the original. `DropoutProcessor` uses it to map a bare `/videos/<slug>` Dimension 20 url onto its `dimension-20-the-complete-series/season:N/` equivalent, which is what carries a usable `season_number`.
 
 ### Metadata Caching
 Episode metadata for Dropout releases is cached in SQLite at `DB_PATH` (default `{CONFIG_DIR}/showsaver.db`).
@@ -101,6 +102,7 @@ Episode metadata for Dropout releases is cached in SQLite at `DB_PATH` (default 
 - **Frontend polling:** `app.js` polls `/dropout/new-releases` every 2 s (up to 30 polls) until every card has a `show_name`.
 - **Concurrency:** WAL journal mode + `busy_timeout=5000` are set in `init_db()` so the download worker, metadata worker, and request threads can write concurrently.
 - **In-memory scrape cache:** `_new_releases_cache` holds a URL list with a 5-minute TTL to avoid re-scraping on every poll; the DB is the source of truth for metadata.
+- **D20 season map:** `_d20_season_cache` holds a `slug -> season` map parsed from `https://watch.dropout.tv/sitemap.xml` with a 1-hour TTL, used by `DropoutProcessor.find_corrected_url()`. A miss forces one refresh before giving up; a failed or unparseable fetch keeps the previous map rather than overwriting it.
 - **Reset:** `bash scripts/reset_db.sh` deletes the local dev DB (`./.local/config/showsaver.db`).
 
 ### Environment Variables
