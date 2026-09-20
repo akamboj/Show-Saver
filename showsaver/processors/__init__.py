@@ -10,3 +10,6 @@ class Processor:
 
     def should_trigger_rename(self, info_dict) -> bool:
         return False
+
+    def find_corrected_url(self, show_url: str, info_dict) -> tuple[str, dict] | None:
+        return None

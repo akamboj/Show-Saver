@@ -1,10 +1,11 @@
 import showsaver.database as database
 import showsaver.sonarr as sonarr
-from showsaver.downloader import BASE_YT_OPTS
+from showsaver.downloader import BASE_YT_OPTS, get_metadata
 from showsaver.processors import Processor
 from showsaver.special_patterns import get_special_patterns
 from showsaver.state import queue_metadata
 
+import re
 import requests
 import time
 import yt_dlp
@@ -21,6 +22,15 @@ _new_releases_cache = {
 }
 CACHE_TTL = 300  # 5 minutes
 METADATA_CACHE_TTL = 7 * 24 * 60 * 60 # 1 week in seconds
+
+DROPOUT_SITEMAP_URL = 'https://watch.dropout.tv/sitemap.xml'
+D20_COMPLETE_SERIES_URL = 'https://watch.dropout.tv/dimension-20-the-complete-series'
+_D20_SITEMAP_RE = re.compile(r'dimension-20-the-complete-series-season-(\d+)/videos/([a-z0-9-]+)')
+_d20_season_cache = {
+    'data': None,
+    'timestamp': 0
+}
+D20_SEASON_CACHE_TTL = 60 * 60  # 1 hour
 
 SHOW_NAME_OVERRIDES = {
     'Very Important People' : 'Very Important People (2023)',
@@ -75,6 +85,37 @@ class DropoutProcessor(Processor):
         return False
 
 
+    def find_corrected_url(self, show_url: str, info_dict) -> tuple[str, dict] | None:
+
+        if 'Dimension 20:' not in (info_dict.get('series') or ''):
+            return None
+
+        print(f'Attempting to correct url: {show_url}')
+        slug = _get_url_path(show_url)
+        season_map = _get_d20_season_map()
+        season = season_map.get(slug)
+        if season is None:
+            # The cached map can be up to D20_SEASON_CACHE_TTL stale, so a miss is most
+            # likely a newly published episode. Refresh once before giving up.
+            season = _get_d20_season_map(force_refresh=True).get(slug)
+        if season is None:
+            print('Failed to find corrected Dimension 20 url.')
+            return None
+
+        url = f'{D20_COMPLETE_SERIES_URL}/season:{season}/videos/{slug}'
+        print(f'Found corrected url: {url}')
+        try:
+            corrected_info = get_metadata(url)
+        except Exception as e:
+            print(f'Failed to fetch metadata for corrected url {url}: {e}')
+            return None
+        if not (corrected_info and corrected_info.get('season_number')):
+            # Season numbers past the real range resolve to the season-less page
+            print(f'Corrected url did not resolve to a season: {url}')
+            return None
+        return url, corrected_info
+
+
     def treat_as_special(self, info_dict) -> bool:
 
         series = info_dict.get('series') or ''
@@ -119,7 +160,7 @@ def _get_new_releases_bs() -> list[dict[str, Any]] | None:
     """
     Use BeautifulSoup to parse webpage to fetch new releases.
     """
-    response = requests.get(DROPOUT_NEW_RELEASES_URL)
+    response = requests.get(DROPOUT_NEW_RELEASES_URL, timeout=30)
 
     if response.status_code == 200:
         try:
@@ -158,6 +199,37 @@ def _get_new_releases_bs() -> list[dict[str, Any]] | None:
     else:
         print(f"Failed to retrieve the page. Status code: {response.status_code}")
     return None
+
+
+def _get_d20_season_map(force_refresh: bool = False) -> dict[str, int]:
+    """
+    Map of episode slug -> season number in the 'Dimension 20: The Complete Series'
+    collection, parsed from the Dropout sitemap. Cached for D20_SEASON_CACHE_TTL.
+    """
+    cached = _d20_season_cache['data']
+    fetched_at = _d20_season_cache['timestamp']
+    if not force_refresh and cached is not None and (time.time() - fetched_at < D20_SEASON_CACHE_TTL):
+        return cached
+
+    try:
+        response = requests.get(DROPOUT_SITEMAP_URL, timeout=30)
+        if response.status_code != 200:
+            print(f'Failed to fetch Dropout sitemap. Status code {response.status_code}')
+            return cached or {}
+        season_map = {
+            slug: int(season) for season, slug in _D20_SITEMAP_RE.findall(response.text)
+        }
+        if not season_map:
+            # A 200 that parses to nothing means the sitemap changed shape, not that the
+            # collection is empty. Keep whatever we already had.
+            print('Dropout sitemap contained no Dimension 20 complete-series entries.')
+            return cached or {}
+        _d20_season_cache['data'] = season_map
+        _d20_season_cache['timestamp'] = time.time()
+        return season_map
+    except Exception as e:
+        print(f'Failed to fetch Dropout sitemap: {e}')
+        return cached or {}
 
 
 def _get_url_path(url: str) -> str:

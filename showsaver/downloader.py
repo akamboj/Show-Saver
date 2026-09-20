@@ -1,5 +1,4 @@
 import os
-import requests
 import shutil
 import time
 import yt_dlp
@@ -112,7 +111,7 @@ BASE_YT_OPTS = {
 
 
 # the info file has the show name and season number, we need these for building the destination path on the server
-def get_metadata(show_url: str):
+def get_metadata(show_url: str) -> dict | None:
     dlp_opts = {
         **BASE_YT_OPTS,
         'skip_download' : True,
@@ -236,42 +235,6 @@ def copy_to_destination(
     print("Copy complete!")
 
 
-def find_corrected_url(show_url: str, info_dict):
-    show_name = info_dict.get('series', '')
-    if 'Dimension 20:' in show_name:
-        print(f'Attempting to correct url: {show_url}')
-        # Loop through seasons
-        # https://watch.dropout.tv/dimension-20/season:27/videos/poppy-persona-non-grata
-        # https://watch.dropout.tv/videos/poppy-persona-non-grata
-        file_name_part = show_url.rsplit('/', 1)[-1]
-        for i in range(1, 100):
-            url_to_try = f'https://watch.dropout.tv/dimension-20/season:{i}/videos/{file_name_part}'
-            try:
-                print(f'Trying url: {url_to_try}')
-                r = requests.head(url_to_try)
-                if r.status_code == 404:
-                    continue
-
-                print(f'Found corrected url: {url_to_try}')
-                new_info_dict = get_metadata(url_to_try)
-                return url_to_try, new_info_dict
-            except Exception as e:
-                print(str(e))
-    return None, None
-
-
-def process_urls(url_list: list[str], desired_destination: PathLike) -> None:
-    print('********** Processing Urls: **********')
-    if len(url_list) > 0:
-        for url in url_list:
-            print(url)
-
-        for url in url_list:
-            process_url(url, desired_destination)
-    else:
-        print("No initial Urls provided.")
-
-
 def process_url(
     show_url: str,
     desired_destination: PathLike,
@@ -284,12 +247,10 @@ def process_url(
     if info_dict.get('_type') == 'playlist':
         return [e['url'] for e in info_dict.get('entries', []) if e.get('url')]
 
-    corrected_url, corrected_info_dict = find_corrected_url(show_url, info_dict)
-    if corrected_url and corrected_info_dict:
-        show_url = corrected_url
-        info_dict = corrected_info_dict
-
     if processor:
+        corrected = processor.find_corrected_url(show_url, info_dict)
+        if corrected:
+            show_url, info_dict = corrected
         processor.process_info_dict(info_dict)
 
     show_path = download_show(show_url, info_dict, progress_callback, processor)
