@@ -105,7 +105,7 @@ Episode metadata for Dropout releases is cached in SQLite at `DB_PATH` (default 
 - **Frontend polling:** `app.js` polls `/dropout/new-releases` every 2 s (up to 30 polls) until every card is settled (has a `show_name`, or `metadata_fetched_at` is set). The refresh button calls `?refresh=true`, which bypasses the scrape cache and clears the Sonarr cache. The 1 s `/queue` poller also re-fetches `/dropout/new-releases` once (unforced) whenever a job whose URL matches a visible release card reaches `completed`, so the ✓ badge appears without a manual refresh.
 - **Concurrency:** WAL journal mode + `busy_timeout=5000` are set in `init_db()` so the download worker, metadata worker, and request threads can write concurrently.
 - **In-memory scrape cache:** `_new_releases_cache` holds a URL list with a 5-minute TTL to avoid re-scraping on every poll; the DB is the source of truth for metadata.
-- **D20 season map:** `_d20_season_cache` holds a `slug -> season` map parsed from `https://watch.dropout.tv/sitemap.xml` with a 1-hour TTL, used by `DropoutProcessor.find_corrected_url()`. A miss forces one refresh before giving up; a failed or unparseable fetch keeps the previous map rather than overwriting it.
+- **D20 season map:** `_d20_season_cache` holds a `slug -> season` map parsed from `https://watch.dropout.tv/sitemap.xml` with a 1-hour TTL, used by `DropoutProcessor.find_d20_season()`. The download path (`find_corrected_url()`) forces one refresh on a miss before giving up; `_annotate_in_library()` also uses it to map a campaign row (e.g. `Dimension 20: Toylight`, season 1) onto `Dimension 20` at its complete-series season with no yt-dlp call and no forced refresh on a miss (the episode number and title are identical on both urls). A failed or unparseable fetch keeps the previous map rather than overwriting it.
 - **Reset:** `bash scripts/reset_db.sh` deletes the local dev DB (`./.local/config/showsaver.db`).
 
 ### Environment Variables
@@ -135,6 +135,7 @@ Optional integration that triggers a series rescan (and optionally rename) in So
 - Rename is only triggered when the processor's `should_trigger_rename()` returns `True`
 
 **Episode presence lookup** (`is_episode_in_library(show_name, override_name, season_number, episode_number, title)`):
+- Dimension 20 campaign rows are first remapped to `Dimension 20` + the sitemap season (see *D20 season map*), then the processor's season offsets apply.
 - Resolves the series with the same name matching as the download path (`_match_series`: exact override → exact original → substring, case-insensitive), then fetches `GET /api/v3/episode?seriesId=` and matches on `(seasonNumber, episodeNumber)`. When either number is unknown, or the pair is the S00E00 placeholder used for specials, it falls back to a case/punctuation-insensitive title match (`text.title_match_key`).
 - Never raises. Returns:
   - `True` — the matched episode has a file (`hasFile`)

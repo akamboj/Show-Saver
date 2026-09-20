@@ -317,6 +317,54 @@ class TestGetD20SeasonMap:
 
 
 @pytest.mark.usefixtures('reset_d20_cache')
+class TestFindD20Season:
+    @pytest.fixture(autouse=True)
+    def no_network(self, monkeypatch):
+        monkeypatch.setattr(dropout.requests, 'get', _fail)
+        monkeypatch.setattr(dropout, 'get_metadata', _fail)
+
+    @pytest.mark.parametrize('series', ['Game Changer', 'Dimension 20', None])
+    def test_non_campaign_series_returns_none_without_map_lookup(self, processor, monkeypatch, series):
+        monkeypatch.setattr(dropout, '_get_d20_season_map', _fail)
+        assert processor.find_d20_season(D20_URL, {'series': series}) is None
+
+    def test_hit_uses_sitemap_map(self, processor, monkeypatch):
+        map_calls = []
+
+        def season_map(force_refresh=False):
+            map_calls.append(force_refresh)
+            return {'poppy-persona-non-grata': 28}
+        monkeypatch.setattr(dropout, '_get_d20_season_map', season_map)
+
+        assert processor.find_d20_season(D20_URL, {'series': 'Dimension 20: Gladlands'}) == 28
+        assert map_calls == [False]
+
+    def test_miss_refreshes_once_by_default(self, processor, monkeypatch):
+        map_calls = []
+
+        def season_map(force_refresh=False):
+            map_calls.append(force_refresh)
+            return {'poppy-persona-non-grata': 28} if force_refresh else {'other': 31}
+        monkeypatch.setattr(dropout, '_get_d20_season_map', season_map)
+
+        assert processor.find_d20_season(D20_URL, {'series': 'Dimension 20: Gladlands'}) == 28
+        assert map_calls == [False, True]
+
+    def test_miss_without_refresh_never_forces_a_fetch(self, processor, monkeypatch):
+        # The request path (in_library badge) must not trigger the ~1.4 MB sitemap
+        # refresh on every poll for a just-published episode.
+        map_calls = []
+
+        def season_map(force_refresh=False):
+            map_calls.append(force_refresh)
+            return {'other': 31}
+        monkeypatch.setattr(dropout, '_get_d20_season_map', season_map)
+
+        assert processor.find_d20_season(D20_URL, {'series': 'Dimension 20: Gladlands'}, refresh_on_miss=False) is None
+        assert map_calls == [False]
+
+
+@pytest.mark.usefixtures('reset_d20_cache')
 class TestFindCorrectedUrl:
     @pytest.fixture(autouse=True)
     def no_network(self, monkeypatch):

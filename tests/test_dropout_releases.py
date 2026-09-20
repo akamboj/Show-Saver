@@ -5,6 +5,10 @@ import pytest
 from showsaver.processors import dropout
 
 
+def _no_network(*_args, **_kwargs):
+    raise AssertionError('unexpected network or yt-dlp call')
+
+
 @pytest.fixture
 def mock_releases(monkeypatch):
     """Wires up get_new_releases dependencies and tracks queue_metadata calls."""
@@ -25,6 +29,9 @@ def mock_releases(monkeypatch):
         'cache_clears': 0,
     }
 
+    # The annotate path must never hit the network or yt-dlp; only the scrape does.
+    monkeypatch.setattr(dropout.requests, 'get', _no_network)
+    monkeypatch.setattr(dropout, 'get_metadata', _no_network)
     monkeypatch.setattr(dropout, '_get_new_releases_bs', lambda: state['scraped'])
     monkeypatch.setattr(dropout.database, 'get_dropout_episode', lambda _url_path: state['db_row'])
 
@@ -160,6 +167,45 @@ class TestInLibraryAnnotation:
         dropout.get_new_releases(force_refresh=True)
         call = mock_releases['sonarr_calls'][0]
         assert (call['season_number'], call['episode_number']) == (None, None)
+
+    def test_dimension_20_campaign_row_is_mapped_to_complete_series(self, mock_releases, monkeypatch):
+        # The metadata worker stores the bare-url values (campaign series, season 1);
+        # the badge lookup must use 'Dimension 20' + the sitemap season, offset-remapped.
+        mock_releases['db_row'] = _row(show_name='Dimension 20: Toylight', season_number=1, episode_number=1)
+        monkeypatch.setattr(dropout, '_get_d20_season_map', lambda **k: {'ep-one': 31})
+        dropout.get_new_releases(force_refresh=True)
+        call = mock_releases['sonarr_calls'][0]
+        assert call['show_name'] == 'Dimension 20'
+        assert call['override_name'] is None
+        assert call['season_number'] == 29
+        assert call['episode_number'] == 1
+        assert call['title'] == 'Ep One'
+
+    def test_dimension_20_campaign_row_missing_from_sitemap_falls_through(self, mock_releases, monkeypatch):
+        mock_releases['db_row'] = _row(show_name='Dimension 20: Toylight', season_number=1, episode_number=1)
+        map_calls = []
+
+        def season_map(force_refresh=False):
+            map_calls.append(force_refresh)
+            return {'other': 31}
+        monkeypatch.setattr(dropout, '_get_d20_season_map', season_map)
+
+        dropout.get_new_releases(force_refresh=True)
+        call = mock_releases['sonarr_calls'][0]
+        assert call['show_name'] == 'Dimension 20: Toylight'
+        assert (call['season_number'], call['episode_number']) == (1, 1)
+        assert map_calls == [False]
+
+    def test_cached_path_maps_dimension_20_campaign_row(self, mock_releases, monkeypatch):
+        mock_releases['db_row'] = _row(show_name='Dimension 20: Toylight', season_number=1, episode_number=3,
+                                       url='https://watch.dropout.tv/videos/ep-one', title='Ep One')
+        monkeypatch.setattr(dropout, '_get_d20_season_map', lambda **k: {'ep-one': 28})
+        dropout._new_releases_cache['data'] = ['https://watch.dropout.tv/videos/ep-one']
+        dropout._new_releases_cache['timestamp'] = time.time()
+        result = dropout.get_new_releases(force_refresh=False)
+        assert result['cached'] is True
+        call = mock_releases['sonarr_calls'][0]
+        assert (call['show_name'], call['season_number'], call['episode_number']) == ('Dimension 20', 27, 3)
 
     def test_cached_path_is_annotated(self, mock_releases):
         mock_releases['db_row'] = _row(url='https://watch.dropout.tv/videos/ep-one')

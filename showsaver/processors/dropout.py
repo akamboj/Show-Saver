@@ -25,6 +25,7 @@ METADATA_CACHE_TTL = 7 * 24 * 60 * 60 # 1 week in seconds
 
 DROPOUT_SITEMAP_URL = 'https://watch.dropout.tv/sitemap.xml'
 D20_COMPLETE_SERIES_URL = 'https://watch.dropout.tv/dimension-20-the-complete-series'
+D20_SERIES_NAME = 'Dimension 20'
 _D20_SITEMAP_RE = re.compile(r'dimension-20-the-complete-series-season-(\d+)/videos/([a-z0-9-]+)')
 _d20_season_cache = {
     'data': None,
@@ -83,24 +84,35 @@ class DropoutProcessor(Processor):
         return False
 
 
+    def find_d20_season(self, show_url: str, info_dict, refresh_on_miss: bool = True) -> int | None:
+        """
+        Complete-series season for a Dimension 20 campaign url, from the sitemap map.
+        Returns None when the series is not a campaign or the slug is unknown.
+        """
+        if 'Dimension 20:' not in (info_dict.get('series') or ''):
+            return None
+
+        slug = _get_url_path(show_url)
+        season = _get_d20_season_map().get(slug)
+        if season is None and refresh_on_miss:
+            # The cached map can be up to D20_SEASON_CACHE_TTL stale, so a miss is most
+            # likely a newly published episode. Refresh once before giving up.
+            season = _get_d20_season_map(force_refresh=True).get(slug)
+        return season
+
+
     def find_corrected_url(self, show_url: str, info_dict) -> tuple[str, dict] | None:
 
         if 'Dimension 20:' not in (info_dict.get('series') or ''):
             return None
 
         print(f'Attempting to correct url: {show_url}')
-        slug = _get_url_path(show_url)
-        season_map = _get_d20_season_map()
-        season = season_map.get(slug)
-        if season is None:
-            # The cached map can be up to D20_SEASON_CACHE_TTL stale, so a miss is most
-            # likely a newly published episode. Refresh once before giving up.
-            season = _get_d20_season_map(force_refresh=True).get(slug)
+        season = self.find_d20_season(show_url, info_dict)
         if season is None:
             print('Failed to find corrected Dimension 20 url.')
             return None
 
-        url = f'{D20_COMPLETE_SERIES_URL}/season:{season}/videos/{slug}'
+        url = f'{D20_COMPLETE_SERIES_URL}/season:{season}/videos/{_get_url_path(show_url)}'
         print(f'Found corrected url: {url}')
         try:
             corrected_info = get_metadata(url)
@@ -127,7 +139,7 @@ class DropoutProcessor(Processor):
     def __is_dim20(self, info_dict) -> bool:
 
         series = info_dict.get('series', '')
-        if 'Dimension 20' == series:
+        if D20_SERIES_NAME == series:
             return True
         return False
 
@@ -266,10 +278,16 @@ def _annotate_in_library(video: dict, processor: DropoutProcessor) -> None:
         'season_number': video.get('season_number'),
         'episode_number': video.get('episode_number'),
     }
+    # Map a D20 campaign row onto 'Dimension 20' at its complete-series season; the
+    # episode number and title are identical, so the sitemap map is enough (no yt-dlp).
+    season = processor.find_d20_season(video.get('url') or '', info, refresh_on_miss=False)
+    if season is not None:
+        info['series'] = D20_SERIES_NAME
+        info['season_number'] = season
     processor.process_info_dict(info)
     video['in_library'] = sonarr.is_episode_in_library(
-        show_name,
-        processor.get_show_name_override(show_name),
+        info['series'],
+        processor.get_show_name_override(info['series']),
         info['season_number'],
         info['episode_number'],
         info['title'],
