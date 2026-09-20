@@ -68,11 +68,9 @@ class DropoutProcessor(Processor):
             dlp_opts['outtmpl'] = {'default' : f'%(series)s - S{season_number}E%(episode_number)02d - %(title)s WEBDL-1080p.%(ext)s'}
 
 
-    def process_show_name(self, show_name: str) -> str:
+    def get_show_name_override(self, show_name: str) -> str | None:
 
-        if show_name in SHOW_NAME_OVERRIDES:
-            return SHOW_NAME_OVERRIDES[show_name]
-        return show_name
+        return SHOW_NAME_OVERRIDES.get(show_name)
 
 
     def should_trigger_rename(self, info_dict) -> bool:
@@ -271,7 +269,7 @@ def _annotate_in_library(video: dict, processor: DropoutProcessor) -> None:
     processor.process_info_dict(info)
     video['in_library'] = sonarr.is_episode_in_library(
         show_name,
-        processor.process_show_name(show_name),
+        processor.get_show_name_override(show_name),
         info['season_number'],
         info['episode_number'],
         info['title'],

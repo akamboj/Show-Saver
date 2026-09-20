@@ -392,3 +392,21 @@ class TestFindCorrectedUrl:
         monkeypatch.setattr(dropout, 'get_metadata', lambda url: {'series': 'Dimension 20'})
 
         assert processor.find_corrected_url(D20_URL, {'series': 'Dimension 20: Gladlands'}) is None
+
+
+class TestGetShowNameOverride:
+    @pytest.mark.parametrize('show_name, expected', [
+        ('Very Important People', 'Very Important People (2023)'),
+        ('Don\'t Hug Me I\'m Scared', 'Don\'t Hug Me I\'m Scared (2022)'),
+    ])
+    def test_known_shows_return_their_override(self, processor, show_name, expected):
+        assert processor.get_show_name_override(show_name) == expected
+
+    @pytest.mark.parametrize('show_name', [
+        'Dimension 20',
+        'Game Changer',
+        'very important people',  # overrides are exact-match, not case-insensitive
+        '',
+    ])
+    def test_unknown_shows_return_none(self, processor, show_name):
+        assert processor.get_show_name_override(show_name) is None

@@ -90,7 +90,7 @@ env.py
 Processors customize download behavior per content source. `DropoutProcessor` (in `processors/dropout.py`) is the current implementation:
 - `process_info_dict()` — zeroes season/episode to S00E00 for specials (TOML pattern rules) and applies the Dimension 20 / Adventuring Party season offsets
 - `process_dlp_opts()` — customizes output template for special episodes
-- `process_show_name()` — applies show name overrides (e.g., `'Very Important People'` → `'Very Important People (2023)'`)
+- `get_show_name_override()` — returns the override for a show name (e.g., `'Very Important People'` → `'Very Important People (2023)'`), or `None` when no override applies
 - `should_trigger_rename()` — returns `True` for episodes that need Sonarr rename
 - `find_corrected_url()` — returns `(url, info_dict)` when a source-specific url rewrite applies, or `None` to keep the original. `DropoutProcessor` uses it to map a bare `/videos/<slug>` Dimension 20 url onto its `dimension-20-the-complete-series/season:N/` equivalent, which is what carries a usable `season_number`.
 

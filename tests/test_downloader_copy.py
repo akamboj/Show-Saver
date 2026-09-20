@@ -10,8 +10,8 @@ class _OverrideProcessor(Processor):
     def __init__(self, mapping):
         self._mapping = mapping
 
-    def process_show_name(self, show_name):
-        return self._mapping.get(show_name, show_name)
+    def get_show_name_override(self, show_name):
+        return self._mapping.get(show_name)
 
 
 @pytest.fixture

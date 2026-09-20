@@ -148,6 +148,13 @@ class TestInLibraryAnnotation:
         assert (call['season_number'], call['episode_number']) == (0, 0)
         assert call['title'] == 'Last Looks: Someone'
 
+    def test_show_without_override_forwards_none(self, mock_releases):
+        mock_releases['db_row'] = _row(show_name='Dimension 20', season_number=6, episode_number=3)
+        dropout.get_new_releases(force_refresh=True)
+        call = mock_releases['sonarr_calls'][0]
+        assert call['show_name'] == 'Dimension 20'
+        assert call['override_name'] is None
+
     def test_null_numbers_pass_through_for_title_fallback(self, mock_releases):
         mock_releases['db_row'] = _row(show_name='Dimension 20', season_number=None, episode_number=None)
         dropout.get_new_releases(force_refresh=True)
