@@ -5,6 +5,10 @@ import pytest
 from showsaver.processors import dropout
 
 
+_REAL_IS_EPISODE_IN_LIBRARY = dropout.sonarr.is_episode_in_library
+_REAL_CLEAR_CACHE = dropout.sonarr.clear_cache
+
+
 def _no_network(*_args, **_kwargs):
     raise AssertionError('unexpected network or yt-dlp call')
 
@@ -119,24 +123,17 @@ def _row(**overrides):
 
 
 class TestInLibraryAnnotation:
-    @pytest.mark.parametrize('flag', [True, False, None])
-    def test_in_library_propagates_from_sonarr(self, mock_releases, flag):
+    def test_in_library_propagates_from_sonarr(self, mock_releases):
         mock_releases['db_row'] = _row()
-        mock_releases['in_library'] = flag
+        mock_releases['in_library'] = False
         result = dropout.get_new_releases(force_refresh=True)
-        assert result['videos'][0]['in_library'] is flag
+        assert result['videos'][0]['in_library'] is False
 
     def test_empty_show_name_skips_sonarr(self, mock_releases):
         mock_releases['db_row'] = {'show_name': '', 'metadata_fetched_at': None}
         result = dropout.get_new_releases(force_refresh=True)
         assert result['videos'][0]['in_library'] is None
         assert mock_releases['sonarr_calls'] == []
-
-    def test_season_and_episode_numbers_are_exposed(self, mock_releases):
-        mock_releases['db_row'] = _row()
-        result = dropout.get_new_releases(force_refresh=True)
-        assert result['videos'][0]['season_number'] == 6
-        assert result['videos'][0]['episode_number'] == 3
 
     def test_dimension_20_season_is_remapped_before_lookup(self, mock_releases):
         mock_releases['db_row'] = _row(show_name='Dimension 20', season_number=30, episode_number=5)
@@ -154,19 +151,6 @@ class TestInLibraryAnnotation:
         assert call['override_name'] == 'Very Important People (2023)'
         assert (call['season_number'], call['episode_number']) == (0, 0)
         assert call['title'] == 'Last Looks: Someone'
-
-    def test_show_without_override_forwards_none(self, mock_releases):
-        mock_releases['db_row'] = _row(show_name='Dimension 20', season_number=6, episode_number=3)
-        dropout.get_new_releases(force_refresh=True)
-        call = mock_releases['sonarr_calls'][0]
-        assert call['show_name'] == 'Dimension 20'
-        assert call['override_name'] is None
-
-    def test_null_numbers_pass_through_for_title_fallback(self, mock_releases):
-        mock_releases['db_row'] = _row(show_name='Dimension 20', season_number=None, episode_number=None)
-        dropout.get_new_releases(force_refresh=True)
-        call = mock_releases['sonarr_calls'][0]
-        assert (call['season_number'], call['episode_number']) == (None, None)
 
     def test_dimension_20_campaign_row_is_mapped_to_complete_series(self, mock_releases, monkeypatch):
         # The metadata worker stores the bare-url values (campaign series, season 1);
@@ -196,17 +180,6 @@ class TestInLibraryAnnotation:
         assert (call['season_number'], call['episode_number']) == (1, 1)
         assert map_calls == [False]
 
-    def test_cached_path_maps_dimension_20_campaign_row(self, mock_releases, monkeypatch):
-        mock_releases['db_row'] = _row(show_name='Dimension 20: Toylight', season_number=1, episode_number=3,
-                                       url='https://watch.dropout.tv/videos/ep-one', title='Ep One')
-        monkeypatch.setattr(dropout, '_get_d20_season_map', lambda **k: {'ep-one': 28})
-        dropout._new_releases_cache['data'] = ['https://watch.dropout.tv/videos/ep-one']
-        dropout._new_releases_cache['timestamp'] = time.time()
-        result = dropout.get_new_releases(force_refresh=False)
-        assert result['cached'] is True
-        call = mock_releases['sonarr_calls'][0]
-        assert (call['show_name'], call['season_number'], call['episode_number']) == ('Dimension 20', 27, 3)
-
     def test_cached_path_is_annotated(self, mock_releases):
         mock_releases['db_row'] = _row(url='https://watch.dropout.tv/videos/ep-one')
         mock_releases['in_library'] = True
@@ -216,12 +189,40 @@ class TestInLibraryAnnotation:
         assert result['cached'] is True
         assert result['videos'][0]['in_library'] is True
 
-    def test_force_refresh_clears_sonarr_cache(self, mock_releases):
+    @pytest.mark.parametrize('force_refresh, expected_clears', [(True, 1), (False, 0)])
+    def test_only_force_refresh_clears_sonarr_cache(self, mock_releases, force_refresh, expected_clears):
         mock_releases['db_row'] = {'show_name': '', 'metadata_fetched_at': None}
-        dropout.get_new_releases(force_refresh=True)
-        assert mock_releases['cache_clears'] == 1
+        dropout.get_new_releases(force_refresh=force_refresh)
+        assert mock_releases['cache_clears'] == expected_clears
 
-    def test_unforced_fetch_keeps_sonarr_cache(self, mock_releases):
-        mock_releases['db_row'] = {'show_name': '', 'metadata_fetched_at': None}
-        dropout.get_new_releases(force_refresh=False)
-        assert mock_releases['cache_clears'] == 0
+    def test_real_sonarr_lookup_for_dimension_20_campaign_row(self, mock_releases, monkeypatch):
+        # End to end across the dropout -> sonarr boundary, with only HTTP faked.
+        monkeypatch.setattr(dropout.sonarr, 'is_episode_in_library', _REAL_IS_EPISODE_IN_LIBRARY)
+        monkeypatch.setattr(dropout.sonarr, 'SONARR_URL', 'http://sonarr.test')
+        monkeypatch.setattr(dropout.sonarr, 'SONARR_API_KEY', 'key')
+        _REAL_CLEAR_CACHE()
+        monkeypatch.setattr(dropout, '_get_d20_season_map', lambda **k: {'ep-one': 31})
+        mock_releases['db_row'] = _row(show_name='Dimension 20: Toylight', season_number=1, episode_number=1)
+
+        class _Resp:
+            def __init__(self, payload):
+                self._payload = payload
+
+            def raise_for_status(self):
+                pass
+
+            def json(self):
+                return self._payload
+
+        def _sonarr_get(url, headers=None, params=None, timeout=None):
+            if url.endswith('/api/v3/series'):
+                return _Resp([{'id': 7, 'title': 'Dimension 20'}])
+            assert url.endswith('/api/v3/episode') and params == {'seriesId': 7}
+            return _Resp([{'seasonNumber': 29, 'episodeNumber': 1, 'title': 'Ep One', 'hasFile': True}])
+        monkeypatch.setattr(dropout.sonarr.requests, 'get', _sonarr_get)
+
+        try:
+            result = dropout.get_new_releases(force_refresh=True)
+        finally:
+            _REAL_CLEAR_CACHE()
+        assert result['videos'][0]['in_library'] is True

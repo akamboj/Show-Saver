@@ -34,9 +34,7 @@ const SAFE_STATUS_CLASSES = new Set(['pending', 'queued', 'downloading', 'comple
 const RELEASES_MAX_CARDS = 9;
 const RELEASES_POLL_INTERVAL_MS = 2000;
 const RELEASES_POLL_MAX = 30;
-const RELEASES_BADGE_RETRY_MS = 10000;
 let releasesPollTimer = null;
-let badgeRetryTimer = null;
 const PLACEHOLDER_THUMB = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 320 180'%3E%3Crect fill='%232a2a2a' width='320' height='180'/%3E%3Crect x='100' y='45' width='120' height='75' rx='4' fill='none' stroke='%23555' stroke-width='4'/%3E%3Crect x='110' y='55' width='100' height='55' fill='%23333'/%3E%3Crect x='140' y='120' width='40' height='8' fill='%23555'/%3E%3Crect x='130' y='128' width='60' height='6' rx='2' fill='%23555'/%3E%3C/svg%3E";
 
 function clearAndAppend(parent, ...nodes) {
@@ -220,22 +218,13 @@ async function updateQueueStatus() {
 
             // When a download for a visible release card finishes, re-fetch the
             // releases once so the "in library" badge reflects the new file.
-            const completedIds = new Set(data.completed.map(c => c.id));
-            if (seenCompletedJobIds === null) {
-                seenCompletedJobIds = completedIds;
-            } else {
-                // c.url is the raw submitted text, which queueRelease sends as
-                // card.dataset.url verbatim; the server does not normalize it.
-                const newlyCompleted = data.completed.filter(c => !seenCompletedJobIds.has(c.id));
-                if (newlyCompleted.some(c => findReleaseCard(c.url))) {
-                    refreshReleaseCards();
-                    // Sonarr's import may lag the rescan wait; try once more
-                    // (one pending retry at a time, whatever the burst size).
-                    clearTimeout(badgeRetryTimer);
-                    badgeRetryTimer = setTimeout(refreshReleaseCards, RELEASES_BADGE_RETRY_MS);
-                }
-                seenCompletedJobIds = completedIds;
+            const newlyCompleted = seenCompletedJobIds
+                ? data.completed.filter(c => !seenCompletedJobIds.has(c.id))
+                : [];
+            if (newlyCompleted.some(c => findReleaseCard(c.url))) {
+                refreshReleaseCards();
             }
+            seenCompletedJobIds = new Set(data.completed.map(c => c.id));
         }
     } catch (error) {
         console.error('Failed to update queue status:', error);

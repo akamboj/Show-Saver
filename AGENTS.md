@@ -98,14 +98,13 @@ Processors customize download behavior per content source. `DropoutProcessor` (i
 Episode metadata for Dropout releases is cached in SQLite at `DB_PATH` (default `{CONFIG_DIR}/showsaver.db`).
 
 - **Table:** `dropout_episodes(url_path PK, url, show_name, title, thumbnail, duration, fetched_at, metadata_fetched_at, season_number, episode_number)`
-- **Season/episode numbers:** stored as the *raw* yt-dlp values by the metadata worker. They are remapped at read time (Dimension 20 offsets, specials → S00E00) by running `DropoutProcessor.process_info_dict()` in `_annotate_in_library()`, so the offset rules live in one place and never get frozen into the DB.
-- **`in_library` field:** each video in `/dropout/new-releases` carries a tri-state `in_library` computed on every request (see *Episode presence lookup* under Sonarr Integration). The frontend shows a ✓ badge on the card when `true`.
+- **Season/episode numbers:** stored as *raw* yt-dlp values and remapped at read time via `DropoutProcessor.process_info_dict()` in `_annotate_in_library()`, which sets each release's tri-state `in_library` (see *Episode presence lookup*); the frontend shows a ✓ badge when `true`.
 - **Scrape path:** `/dropout/new-releases` triggers `get_new_releases()`, which scrapes the public HTML, upserts scrape-time fields via `upsert_dropout_episode_basic()` (preserves any existing `show_name`), and enqueues a background `metadata_worker` job for any row still missing `show_name`.
 - **Worker:** `metadata_worker` (started in `main.py`) runs yt-dlp per URL and calls `upsert_dropout_episode()` with the full row. `metadata_in_flight` (guarded by `thread_lock`) dedups concurrent enqueues.
-- **Frontend polling:** `app.js` polls `/dropout/new-releases` every 2 s (up to 30 polls) until every card is settled (has a `show_name`, or `metadata_fetched_at` is set). The refresh button calls `?refresh=true`, which bypasses the scrape cache and clears the Sonarr cache. The 1 s `/queue` poller also re-fetches `/dropout/new-releases` once (unforced) whenever a job whose URL matches a visible release card reaches `completed`, so the ✓ badge appears without a manual refresh.
+- **Frontend polling:** `app.js` polls `/dropout/new-releases` every 2 s (up to 30 polls) until every card is settled (has a `show_name`, or `metadata_fetched_at` is set). The refresh button calls `?refresh=true`, which bypasses the scrape cache and clears the Sonarr cache. The `/queue` poller re-fetches it once when a job for a visible card completes, so the ✓ badge updates without a manual refresh.
 - **Concurrency:** WAL journal mode + `busy_timeout=5000` are set in `init_db()` so the download worker, metadata worker, and request threads can write concurrently.
 - **In-memory scrape cache:** `_new_releases_cache` holds a URL list with a 5-minute TTL to avoid re-scraping on every poll; the DB is the source of truth for metadata.
-- **D20 season map:** `_d20_season_cache` holds a `slug -> season` map parsed from `https://watch.dropout.tv/sitemap.xml` with a 1-hour TTL, used by `DropoutProcessor.find_d20_season()`. The download path (`find_corrected_url()`) forces one refresh on a miss before giving up; `_annotate_in_library()` also uses it to map a campaign row (e.g. `Dimension 20: Toylight`, season 1) onto `Dimension 20` at its complete-series season with no yt-dlp call and no forced refresh on a miss (the episode number and title are identical on both urls). A failed or unparseable fetch keeps the previous map rather than overwriting it.
+- **D20 season map:** `_d20_season_cache` holds a `slug -> season` map parsed from `https://watch.dropout.tv/sitemap.xml` with a 1-hour TTL, used by `DropoutProcessor.find_d20_season()`. The download path forces one refresh on a miss; the badge path (`_annotate_in_library()`) never does. A failed or unparseable fetch keeps the previous map and is retried after the TTL.
 - **Reset:** `bash scripts/reset_db.sh` deletes the local dev DB (`./.local/config/showsaver.db`).
 
 ### Environment Variables
@@ -131,7 +130,7 @@ Uses `.netrc` file in `CONFIG_DIR` for site credentials. The `netrc_location` is
 ### Sonarr Integration
 Optional integration that triggers a series rescan (and optionally rename) in Sonarr after downloading. Configure `SONARR_URL` and `SONARR_API_KEY` to enable.
 - Non-blocking: Sonarr failures are logged as warnings but never cause downloads to fail
-- Always waits for the rescan command to finish (`wait_for_command`, bounded to 30 s total) and then calls `clear_cache()` (which also discards any lookup still in flight), so by the time the download job is marked completed an `in_library` lookup sees the imported file. Rename, when needed, is triggered after that wait. The frontend re-fetches the badge once on completion and once more 10 s later in case the import lagged the wait.
+- Waits for the rescan command to finish (`wait_for_command`, ~30 s max), then calls `clear_cache()` so `in_library` lookups see the imported file; rename, when needed, runs after that.
 - Rename is only triggered when the processor's `should_trigger_rename()` returns `True`
 
 **Episode presence lookup** (`is_episode_in_library(show_name, override_name, season_number, episode_number, title)`):
@@ -141,7 +140,7 @@ Optional integration that triggers a series rescan (and optionally rename) in So
   - `True` — the matched episode has a file (`hasFile`)
   - `False` — Sonarr knows the episode but has no file
   - `None` — show name not yet resolved, Sonarr disabled, series/episode unmatched, or the lookup failed
-- Series and per-series episode lists are cached in-module for `SONARR_CACHE_TTL` (60 s). The lock is not held during the HTTP call, so a slow Sonarr never stalls other callers; a `clear_cache()` during an in-flight fetch discards that fetch's result (generation counter) rather than letting stale data outlive the clear. Failures are cached too (negative caching) and read timeouts are `LOOKUP_TIMEOUT` (5 s), so an unreachable Sonarr costs at most one short stall per minute rather than one per frontend poll. `sonarr.clear_cache()` drops the cache; `get_new_releases(force_refresh=True)` calls it.
+- Series and episode lists are cached for `SONARR_CACHE_TTL` (60 s), failures included, with a 5 s `LOOKUP_TIMEOUT`. `sonarr.clear_cache()` drops them; `get_new_releases(force_refresh=True)` calls it.
 
 ### File Organization
 - Standard episodes: `{SHOW_DIR}/{ShowName}/Season {N}/{filename}`

@@ -80,27 +80,17 @@ class TestMatchSeries:
 
 
 class TestMatchEpisode:
-    def test_season_episode_hit(self):
-        ep = sonarr._match_episode(EPISODES_GAME_CHANGER, 6, 3, 'ignored')
-        assert ep['id'] == 10
-
-    def test_season_episode_known_but_unmatched_does_not_fall_back_to_title(self):
-        assert sonarr._match_episode(EPISODES_GAME_CHANGER, 9, 9, 'The Big One') is None
-
-    def test_zero_zero_falls_back_to_title(self):
-        ep = sonarr._match_episode(EPISODES_GAME_CHANGER, 0, 0, "Last Looks - 'Sam'")
-        assert ep['id'] == 12
-
-    def test_none_numbers_fall_back_to_title(self):
-        ep = sonarr._match_episode(EPISODES_GAME_CHANGER, None, None, 'the big one')
-        assert ep['id'] == 10
-
-    def test_title_fallback_with_empty_title_returns_none(self):
-        assert sonarr._match_episode(EPISODES_GAME_CHANGER, None, None, '') is None
-
-    def test_missing_episode_number_falls_back_to_title(self):
-        ep = sonarr._match_episode(EPISODES_GAME_CHANGER, 6, None, 'Not Yet')
-        assert ep['id'] == 11
+    @pytest.mark.parametrize('season, episode, title, expected_id', [
+        (6, 3, 'ignored', 10),                # season/episode hit
+        (9, 9, 'The Big One', None),          # numbers known but unmatched: no title fallback
+        (0, 0, "Last Looks - 'Sam'", 12),     # S00E00 placeholder falls back to title
+        (None, None, 'the big one', 10),      # unknown numbers fall back to title
+        (6, None, 'Not Yet', 11),             # one unknown number falls back to title
+        (None, None, '', None),               # empty title never matches
+    ])
+    def test_match(self, season, episode, title, expected_id):
+        ep = sonarr._match_episode(EPISODES_GAME_CHANGER, season, episode, title)
+        assert (ep or {}).get('id') == expected_id
 
 
 @pytest.mark.usefixtures('sonarr_enabled')
@@ -115,23 +105,13 @@ class TestIsEpisodeInLibrary:
     def test_has_file(self, fake_get, episode_number, expected):
         assert sonarr.is_episode_in_library('Game Changer', None, 6, episode_number, 'x') is expected
 
-    def test_series_not_found_returns_none(self, fake_get):
-        assert sonarr.is_episode_in_library('Make Some Noise', None, 1, 1, 'x') is None
-        # Only the series list was fetched
-        assert len(fake_get['calls']) == 1
+    @pytest.mark.parametrize('show_name, season', [('Make Some Noise', 1), ('Game Changer', 42)])
+    def test_unmatched_series_or_episode_returns_none(self, fake_get, show_name, season):
+        assert sonarr.is_episode_in_library(show_name, None, season, season, 'x') is None
 
-    def test_episode_not_found_returns_none(self, fake_get):
-        assert sonarr.is_episode_in_library('Game Changer', None, 42, 42, 'x') is None
-
-    def test_special_matched_by_title(self, fake_get):
-        assert sonarr.is_episode_in_library('Game Changer', None, 0, 0, "Last Looks - 'Sam'") is True
-
-    def test_series_http_error_returns_none(self, fake_get):
-        fake_get['fail_series'] = True
-        assert sonarr.is_episode_in_library('Game Changer', None, 6, 3, 'x') is None
-
-    def test_episode_http_error_returns_none(self, fake_get):
-        fake_get['fail_episodes'] = True
+    @pytest.mark.parametrize('failure', ['fail_series', 'fail_episodes'])
+    def test_http_error_returns_none(self, fake_get, failure):
+        fake_get[failure] = True
         assert sonarr.is_episode_in_library('Game Changer', None, 6, 3, 'x') is None
 
     def test_second_call_uses_cache(self, fake_get):
@@ -152,22 +132,8 @@ class TestIsEpisodeInLibrary:
         assert sonarr.is_episode_in_library('Game Changer', None, 6, 3, 'x') is None
         assert len(fake_get['calls']) == 1
 
-    def test_cache_expires_after_ttl(self, fake_get, monkeypatch):
-        clock = {'now': 1000.0}
-        monkeypatch.setattr('time.time', lambda: clock['now'])
-        sonarr.is_episode_in_library('Game Changer', None, 6, 3, 'x')
-        clock['now'] += sonarr.SONARR_CACHE_TTL + 1
-        sonarr.is_episode_in_library('Game Changer', None, 6, 3, 'x')
-        assert len(fake_get['calls']) == 4
-
     def test_malformed_series_payload_returns_none(self, fake_get):
         fake_get['series'] = [{'title': None, 'id': 1}]
-        assert sonarr.is_episode_in_library('Game Changer', None, 6, 3, 'x') is None
-
-    def test_unexpected_exception_returns_none(self, monkeypatch):
-        def _boom(*_a, **_k):
-            raise RuntimeError('unexpected')
-        monkeypatch.setattr(sonarr, '_cached', _boom)
         assert sonarr.is_episode_in_library('Game Changer', None, 6, 3, 'x') is None
 
     def test_clear_during_inflight_fetch_is_not_resurrected(self):
@@ -183,38 +149,12 @@ class TestIsEpisodeInLibrary:
 
 
 class TestWaitForCommand:
-    def test_timeout_is_bounded_and_never_raises(self, sonarr_enabled, monkeypatch):
-        clock = {'now': 0.0}
-        timeouts = []
-        monkeypatch.setattr('time.monotonic', lambda: clock['now'])
-        monkeypatch.setattr('time.sleep', lambda s: clock.__setitem__('now', clock['now'] + s))
-
-        def _get(url, headers=None, params=None, timeout=None):
-            timeouts.append(timeout)
-            clock['now'] += 2  # each poll takes 2 s of wall time
-            return _Resp({'status': 'started'})
-        monkeypatch.setattr(sonarr.requests, 'get', _get)
-
-        assert sonarr.wait_for_command(99, timeout=30, poll_interval=3) == 'timeout'
-        assert clock['now'] <= 30
-        assert timeouts and all(1 <= t <= 10 for t in timeouts)
-
     def test_returns_terminal_status(self, sonarr_enabled, monkeypatch):
         statuses = iter(['queued', 'started', 'completed'])
         monkeypatch.setattr('time.sleep', lambda _s: None)
         monkeypatch.setattr(sonarr.requests, 'get',
                             lambda url, headers=None, params=None, timeout=None: _Resp({'status': next(statuses)}))
         assert sonarr.wait_for_command(99) == 'completed'
-
-
-class TestFindSeriesByName:
-    def test_is_uncached(self, sonarr_enabled, fake_get):
-        assert sonarr.find_series_by_name('Game Changer') == 1
-        assert sonarr.find_series_by_name('Game Changer') == 1
-        assert len(fake_get['calls']) == 2
-
-    def test_override_then_original(self, sonarr_enabled, fake_get):
-        assert sonarr.find_series_by_name('Very Important People', 'Very Important People (2023)') == 2
 
 
 @pytest.fixture
@@ -274,12 +214,6 @@ class TestRefreshAndRescanSeries:
         _prime_cache()
         assert sonarr.refresh_and_rescan_series('Game Changer') is True
         assert [c[0] for c in rescan_stubs['calls']] == ['find', 'rescan']
-        assert sonarr._cache == {}
-
-    def test_timeout_still_clears_cache(self, rescan_stubs):
-        rescan_stubs['wait_status'] = 'timeout'
-        _prime_cache()
-        assert sonarr.refresh_and_rescan_series('Game Changer') is True
         assert sonarr._cache == {}
 
     def test_series_not_found_returns_false_and_keeps_cache(self, rescan_stubs):

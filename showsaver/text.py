@@ -12,11 +12,5 @@ def normalize_title(title: str) -> str:
 
 
 def title_match_key(title: str | None) -> str:
-    """
-    Reduce a title to a loose comparison key: lowercase alphanumerics only.
-
-    DB titles have already been through normalize_title (quotes -> ', '?' removed)
-    while Sonarr/TVDB titles have not, so compare on a key that ignores case and
-    punctuation entirely.
-    """
+    """Lowercase alphanumerics only, so normalized DB titles match raw Sonarr titles."""
     return re.sub(r'[^a-z0-9]+', '', (title or '').lower())

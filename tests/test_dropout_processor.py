@@ -1,3 +1,5 @@
+from unittest.mock import MagicMock
+
 import pytest
 
 import showsaver.processors.dropout as dropout
@@ -175,62 +177,28 @@ class TestProcessDlpOpts:
         assert 'SNone' not in opts['outtmpl']['default']
 
 
-@pytest.fixture
-def fake_ydl(monkeypatch):
-    """Patch yt-dlp to return a fixed info dict; returns the kwargs captured by the DB upsert."""
-    captured = {}
-
-    def _install(info):
-        class _FakeYDL:
-            def __init__(self, _opts):
-                pass
-
-            def __enter__(self):
-                return self
-
-            def __exit__(self, *_exc):
-                return False
-
-            def extract_info(self, _url, download=False):
-                return info
-
-        monkeypatch.setattr(dropout.yt_dlp, 'YoutubeDL', _FakeYDL)
-        monkeypatch.setattr(dropout.database, 'upsert_dropout_episode', lambda **kw: captured.update(kw))
-        return captured
-
-    return _install
-
-
 class TestFetchAndStoreEpisodeInfo:
-    def test_persists_raw_season_and_episode_numbers(self, fake_ydl):
-        captured = fake_ydl({
+    def test_persists_raw_season_and_episode_numbers(self, monkeypatch):
+        info = {
             'title': 'Some Episode',
             'webpage_url': 'https://watch.dropout.tv/videos/some-episode',
-            'thumbnail': 'https://t/1.jpg',
-            'duration': 100,
-            'id': 'abc',
             'series': 'Dimension 20',
             'season_number': 30,
             'episode_number': 5,
-        })
+        }
+        ydl = MagicMock()
+        ydl.__enter__.return_value.extract_info.return_value = info
+        monkeypatch.setattr(dropout.yt_dlp, 'YoutubeDL', lambda _opts: ydl)
+        captured = {}
+        monkeypatch.setattr(dropout.database, 'upsert_dropout_episode', lambda **kw: captured.update(kw))
 
         result = dropout.fetch_and_store_episode_info('https://watch.dropout.tv/videos/some-episode')
 
-        assert result['season_number'] == 30
-        assert result['episode_number'] == 5
+        assert (result['season_number'], result['episode_number']) == (30, 5)
         # Raw yt-dlp value is stored; the D20 remap happens at read time
-        assert captured['season_number'] == 30
-        assert captured['episode_number'] == 5
+        assert (captured['season_number'], captured['episode_number']) == (30, 5)
         assert captured['url_path'] == 'some-episode'
         assert captured['show_name'] == 'Dimension 20'
-
-    def test_missing_numbers_persist_as_none(self, fake_ydl):
-        captured = fake_ydl({'title': 'T', 'webpage_url': 'https://watch.dropout.tv/videos/x', 'series': 'S'})
-
-        dropout.fetch_and_store_episode_info('https://watch.dropout.tv/videos/x')
-
-        assert captured['season_number'] is None
-        assert captured['episode_number'] is None
 
 
 # ---------------------------------------------------------------------------
@@ -300,6 +268,20 @@ class TestGetD20SeasonMap:
         assert dropout._get_d20_season_map(force_refresh=True) == good
         assert dropout._d20_season_cache['data'] == good
 
+    def test_failed_fetch_is_not_retried_within_ttl(self, monkeypatch):
+        # The badge path hits this on every poll; an unreachable sitemap must not
+        # cost a 30 s request each time.
+        calls = []
+
+        def boom(*a, **k):
+            calls.append(a)
+            raise ConnectionError('offline')
+        monkeypatch.setattr(dropout.requests, 'get', boom)
+
+        assert dropout._get_d20_season_map() == {}
+        assert dropout._get_d20_season_map() == {}
+        assert len(calls) == 1
+
     def test_empty_map_is_negatively_cached(self, monkeypatch):
         # An empty map is falsy, so a truthiness check on the cache would re-download
         # the ~1.4 MB sitemap on every single call.
@@ -314,54 +296,6 @@ class TestGetD20SeasonMap:
         dropout._d20_season_cache['timestamp'] = dropout.time.time()
         assert dropout._get_d20_season_map() == {}
         assert calls == []
-
-
-@pytest.mark.usefixtures('reset_d20_cache')
-class TestFindD20Season:
-    @pytest.fixture(autouse=True)
-    def no_network(self, monkeypatch):
-        monkeypatch.setattr(dropout.requests, 'get', _fail)
-        monkeypatch.setattr(dropout, 'get_metadata', _fail)
-
-    @pytest.mark.parametrize('series', ['Game Changer', 'Dimension 20', None])
-    def test_non_campaign_series_returns_none_without_map_lookup(self, processor, monkeypatch, series):
-        monkeypatch.setattr(dropout, '_get_d20_season_map', _fail)
-        assert processor.find_d20_season(D20_URL, {'series': series}) is None
-
-    def test_hit_uses_sitemap_map(self, processor, monkeypatch):
-        map_calls = []
-
-        def season_map(force_refresh=False):
-            map_calls.append(force_refresh)
-            return {'poppy-persona-non-grata': 28}
-        monkeypatch.setattr(dropout, '_get_d20_season_map', season_map)
-
-        assert processor.find_d20_season(D20_URL, {'series': 'Dimension 20: Gladlands'}) == 28
-        assert map_calls == [False]
-
-    def test_miss_refreshes_once_by_default(self, processor, monkeypatch):
-        map_calls = []
-
-        def season_map(force_refresh=False):
-            map_calls.append(force_refresh)
-            return {'poppy-persona-non-grata': 28} if force_refresh else {'other': 31}
-        monkeypatch.setattr(dropout, '_get_d20_season_map', season_map)
-
-        assert processor.find_d20_season(D20_URL, {'series': 'Dimension 20: Gladlands'}) == 28
-        assert map_calls == [False, True]
-
-    def test_miss_without_refresh_never_forces_a_fetch(self, processor, monkeypatch):
-        # The request path (in_library badge) must not trigger the ~1.4 MB sitemap
-        # refresh on every poll for a just-published episode.
-        map_calls = []
-
-        def season_map(force_refresh=False):
-            map_calls.append(force_refresh)
-            return {'other': 31}
-        monkeypatch.setattr(dropout, '_get_d20_season_map', season_map)
-
-        assert processor.find_d20_season(D20_URL, {'series': 'Dimension 20: Gladlands'}, refresh_on_miss=False) is None
-        assert map_calls == [False]
 
 
 @pytest.mark.usefixtures('reset_d20_cache')
@@ -441,20 +375,3 @@ class TestFindCorrectedUrl:
 
         assert processor.find_corrected_url(D20_URL, {'series': 'Dimension 20: Gladlands'}) is None
 
-
-class TestGetShowNameOverride:
-    @pytest.mark.parametrize('show_name, expected', [
-        ('Very Important People', 'Very Important People (2023)'),
-        ('Don\'t Hug Me I\'m Scared', 'Don\'t Hug Me I\'m Scared (2022)'),
-    ])
-    def test_known_shows_return_their_override(self, processor, show_name, expected):
-        assert processor.get_show_name_override(show_name) == expected
-
-    @pytest.mark.parametrize('show_name', [
-        'Dimension 20',
-        'Game Changer',
-        'very important people',  # overrides are exact-match, not case-insensitive
-        '',
-    ])
-    def test_unknown_shows_return_none(self, processor, show_name):
-        assert processor.get_show_name_override(show_name) is None

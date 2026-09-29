@@ -1,5 +1,6 @@
 import showsaver.downloader as downloader
 from showsaver.processors import Processor
+from showsaver.processors.dropout import DropoutProcessor
 
 ORIGINAL_URL = 'https://watch.dropout.tv/videos/poppy-persona-non-grata'
 CORRECTED_URL = 'https://watch.dropout.tv/dimension-20-the-complete-series/season:28/videos/poppy-persona-non-grata'
@@ -39,3 +40,16 @@ def test_corrected_url_and_info_are_used_before_processing(monkeypatch, tmp_path
     assert processor.correct_calls == [(ORIGINAL_URL, ORIGINAL_INFO)]
     assert processor.info_dicts_seen == [CORRECTED_INFO]
     assert downloads == [(CORRECTED_URL, CORRECTED_INFO)]
+
+
+def test_show_without_override_passes_none_to_sonarr(monkeypatch, tmp_path):
+    rescans = []
+    monkeypatch.setattr(downloader, 'get_metadata', lambda url: {'series': 'Game Changer', 'title': 'Ep'})
+    monkeypatch.setattr(downloader, 'download_show', lambda *a, **k: str(tmp_path / 'file.mkv'))
+    monkeypatch.setattr(downloader, 'copy_to_destination', lambda *a, **k: None)
+    monkeypatch.setattr(downloader, 'refresh_and_rescan_series', lambda *a: rescans.append(a))
+    monkeypatch.setattr(downloader, 'DO_CLEANUP', False)
+
+    downloader.process_url('https://watch.dropout.tv/videos/ep', tmp_path, processor=DropoutProcessor())
+
+    assert rescans == [('Game Changer', None, False)]
