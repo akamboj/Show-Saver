@@ -5,8 +5,11 @@ class Processor:
     def process_dlp_opts(self, dlp_opts, info_dict) -> None:
         pass
 
-    def process_show_name(self, show_name: str) -> str:
-        return show_name
+    def get_show_name_override(self, show_name: str) -> str | None:
+        return None
 
     def should_trigger_rename(self, info_dict) -> bool:
         return False
+
+    def find_corrected_url(self, show_url: str, info_dict) -> tuple[str, dict] | None:
+        return None

@@ -46,7 +46,8 @@ downloader.py
 └── process_url()          → master orchestration (metadata → download → organize → Sonarr)
 
 sonarr.py
-└── Sonarr API client: rescan, rename, wait for command completion
+├── Sonarr API client: rescan, rename, wait for command completion
+└── is_episode_in_library()  → episode presence lookup (hasFile) behind a 60 s TTL cache
 
 database.py
 ├── init_db()                        → creates table + enables WAL / busy_timeout
@@ -87,20 +88,23 @@ env.py
 
 ### Processor Pattern
 Processors customize download behavior per content source. `DropoutProcessor` (in `processors/dropout.py`) is the current implementation:
-- `process_info_dict()` — marks "Last Looks" episodes as S00E00 (Specials)
+- `process_info_dict()` — zeroes season/episode to S00E00 for specials (TOML pattern rules) and applies the Dimension 20 / Adventuring Party season offsets
 - `process_dlp_opts()` — customizes output template for special episodes
-- `process_show_name()` — applies show name overrides (e.g., `'Very Important People'` → `'Very Important People (2023)'`)
+- `get_show_name_override()` — returns the override for a show name (e.g., `'Very Important People'` → `'Very Important People (2023)'`), or `None` when no override applies
 - `should_trigger_rename()` — returns `True` for episodes that need Sonarr rename
+- `find_corrected_url()` — returns `(url, info_dict)` when a source-specific url rewrite applies, or `None` to keep the original. `DropoutProcessor` uses it to map a bare `/videos/<slug>` Dimension 20 url onto its `dimension-20-the-complete-series/season:N/` equivalent, which is what carries a usable `season_number`.
 
 ### Metadata Caching
 Episode metadata for Dropout releases is cached in SQLite at `DB_PATH` (default `{CONFIG_DIR}/showsaver.db`).
 
-- **Table:** `dropout_episodes(url_path PK, url, show_name, title, thumbnail, duration, fetched_at)`
+- **Table:** `dropout_episodes(url_path PK, url, show_name, title, thumbnail, duration, fetched_at, metadata_fetched_at, season_number, episode_number)`
+- **Season/episode numbers:** stored as *raw* yt-dlp values and remapped at read time via `DropoutProcessor.process_info_dict()` in `_annotate_in_library()`, which sets each release's tri-state `in_library` (see *Episode presence lookup*); the frontend shows a ✓ badge when `true`.
 - **Scrape path:** `/dropout/new-releases` triggers `get_new_releases()`, which scrapes the public HTML, upserts scrape-time fields via `upsert_dropout_episode_basic()` (preserves any existing `show_name`), and enqueues a background `metadata_worker` job for any row still missing `show_name`.
 - **Worker:** `metadata_worker` (started in `main.py`) runs yt-dlp per URL and calls `upsert_dropout_episode()` with the full row. `metadata_in_flight` (guarded by `thread_lock`) dedups concurrent enqueues.
-- **Frontend polling:** `app.js` polls `/dropout/new-releases` every 2 s (up to 30 polls) until every card has a `show_name`.
+- **Frontend polling:** `app.js` polls `/dropout/new-releases` every 2 s (up to 30 polls) until every card is settled (has a `show_name`, or `metadata_fetched_at` is set). The refresh button calls `?refresh=true`, which bypasses the scrape cache and clears the Sonarr cache. The `/queue` poller re-fetches it once when a job for a visible card completes, so the ✓ badge updates without a manual refresh.
 - **Concurrency:** WAL journal mode + `busy_timeout=5000` are set in `init_db()` so the download worker, metadata worker, and request threads can write concurrently.
 - **In-memory scrape cache:** `_new_releases_cache` holds a URL list with a 5-minute TTL to avoid re-scraping on every poll; the DB is the source of truth for metadata.
+- **D20 season map:** `_d20_season_cache` holds a `slug -> season` map parsed from `https://watch.dropout.tv/sitemap.xml` with a 1-hour TTL, used by `DropoutProcessor.find_d20_season()`. The download path forces one refresh on a miss; the badge path (`_annotate_in_library()`) never does. A failed or unparseable fetch keeps the previous map and is retried after the TTL.
 - **Reset:** `bash scripts/reset_db.sh` deletes the local dev DB (`./.local/config/showsaver.db`).
 
 ### Environment Variables
@@ -126,8 +130,17 @@ Uses `.netrc` file in `CONFIG_DIR` for site credentials. The `netrc_location` is
 ### Sonarr Integration
 Optional integration that triggers a series rescan (and optionally rename) in Sonarr after downloading. Configure `SONARR_URL` and `SONARR_API_KEY` to enable.
 - Non-blocking: Sonarr failures are logged as warnings but never cause downloads to fail
-- Waits for rescan to complete before triggering rename (prevents race conditions)
+- Waits for the rescan command to finish (`wait_for_command`, ~30 s max), then calls `clear_cache()` so `in_library` lookups see the imported file; rename, when needed, runs after that.
 - Rename is only triggered when the processor's `should_trigger_rename()` returns `True`
+
+**Episode presence lookup** (`is_episode_in_library(show_name, override_name, season_number, episode_number, title)`):
+- Dimension 20 campaign rows are first remapped to `Dimension 20` + the sitemap season (see *D20 season map*), then the processor's season offsets apply.
+- Resolves the series with the same name matching as the download path (`_match_series`: exact override → exact original → substring, case-insensitive), then fetches `GET /api/v3/episode?seriesId=` and matches on `(seasonNumber, episodeNumber)`. When either number is unknown, or the pair is the S00E00 placeholder used for specials, it falls back to a case/punctuation-insensitive title match (`text.title_match_key`).
+- Never raises. Returns:
+  - `True` — the matched episode has a file (`hasFile`)
+  - `False` — Sonarr knows the episode but has no file
+  - `None` — show name not yet resolved, Sonarr disabled, series/episode unmatched, or the lookup failed
+- Series and episode lists are cached for `SONARR_CACHE_TTL` (60 s), failures included, with a 5 s `LOOKUP_TIMEOUT`. `sonarr.clear_cache()` drops them; `get_new_releases(force_refresh=True)` calls it.
 
 ### File Organization
 - Standard episodes: `{SHOW_DIR}/{ShowName}/Season {N}/{filename}`
@@ -149,4 +162,4 @@ Keep all imports in alphabetical order within each group (standard library, thir
 
 ## CI/CD and Releases
 
-Workflows: [`build-and-publish-docker-image.yml`](.github/workflows/build-and-publish-docker-image.yml) (tests + Docker publish) and [`release-please.yml`](.github/workflows/release-please.yml). Releases are automated with [release-please](https://github.com/googleapis/release-please): merging PRs to `main` with Conventional Commit titles updates a standing "release PR" that bumps [`showsaver/version.py`](showsaver/version.py) and the changelog; merging that PR cuts the `vX.Y.Z` tag, GitHub Release, and tagged Docker images. The version is no longer edited by hand. See [RELEASING.md](RELEASING.md) for branching, Docker tag policy, and pre-release rules.
+Workflows: [`build-and-publish-docker-image.yml`](.github/workflows/build-and-publish-docker-image.yml) (tests + Docker publish), [`release-please.yml`](.github/workflows/release-please.yml), and [`cut-release.yml`](.github/workflows/cut-release.yml) (manual **Cut Release** button — queues a release PR via an empty `Release-As:` commit, e.g. to ship a dependency refresh with no code changes). Releases are automated with [release-please](https://github.com/googleapis/release-please): merging PRs to `main` with Conventional Commit titles updates a standing "release PR" that bumps [`showsaver/version.py`](showsaver/version.py) and the changelog; merging that PR cuts the `vX.Y.Z` tag, GitHub Release, and tagged Docker images. The version is no longer edited by hand. Python dependencies are pinned in `requirements*.txt`; Dependabot pip/docker PRs use `fix(deps):` titles so merging them queues a PATCH release PR, while `github-actions` PRs stay `build(deps):` (CI-only, no release). See [RELEASING.md](RELEASING.md) for branching, Docker tag policy, and pre-release rules.

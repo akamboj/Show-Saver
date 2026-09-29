@@ -1,0 +1,16 @@
+# Episodes matching a rule are routed to Specials (S00E00 + Sonarr rename).
+# Patterns are case-insensitive regular expressions; an episode matches when
+# the series pattern AND any one of the titles patterns hit.
+# Single-quoted TOML strings are literal — regex backslashes need no escaping.
+
+[[special]]
+series = 'Very Important People'
+titles = ['Last Looks', 'Bonus Content']
+
+[[special]]
+series = 'Game Changer'
+titles = ['Behind the Scenes']
+
+[[special]]
+series = 'Smartypants'
+titles = ['Smartyshorts?']

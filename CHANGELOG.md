@@ -1,5 +1,52 @@
 # Changelog
 
+## [0.6.0](https://github.com/akamboj/Show-Saver/compare/v0.5.3...v0.6.0) (2026-09-29)
+
+
+### Features
+
+* Add checkmark to new releases if in library ([#73](https://github.com/akamboj/Show-Saver/issues/73)) ([23c278e](https://github.com/akamboj/Show-Saver/commit/23c278ee349062e4b5497b8d58d343685f94fd32))
+
+## [0.5.3](https://github.com/akamboj/Show-Saver/compare/v0.5.2...v0.5.3) (2026-09-18)
+
+
+### Bug Fixes
+
+* Fix d20 url mapping to full series ([#69](https://github.com/akamboj/Show-Saver/issues/69)) ([bc97bb2](https://github.com/akamboj/Show-Saver/commit/bc97bb23ba623387e61d9c0598d2d20330eb91f0))
+
+## [0.5.2](https://github.com/akamboj/Show-Saver/compare/v0.5.1...v0.5.2) (2026-09-05)
+
+
+### Bug Fixes
+
+* **deps:** bump gunicorn from 26.1.0 to 26.2.0 in the python-deps group ([#64](https://github.com/akamboj/Show-Saver/issues/64)) ([9d022b4](https://github.com/akamboj/Show-Saver/commit/9d022b49e7f646732e7550803b517281825ccc1a))
+
+## [0.5.1](https://github.com/akamboj/Show-Saver/compare/v0.5.0...v0.5.1) (2026-08-21)
+
+
+### Miscellaneous
+
+* release 0.5.1 ([3756881](https://github.com/akamboj/Show-Saver/commit/37568818bd0b28d37df24a95a8d4b7bb834f877a))
+
+## [0.5.0](https://github.com/akamboj/Show-Saver/compare/v0.4.8...v0.5.0) (2026-07-04)
+
+
+### Features
+
+* move special detection to config file ([#54](https://github.com/akamboj/Show-Saver/issues/54)) ([d5010db](https://github.com/akamboj/Show-Saver/commit/d5010dbad8028462d6ae55908ef53bbe086623f4))
+
+
+### Bug Fixes
+
+* remove unnecessary passes ([94d24df](https://github.com/akamboj/Show-Saver/commit/94d24df514255066a60f767a97bb94a3509ccbfe))
+
+## [0.4.8](https://github.com/akamboj/Show-Saver/compare/v0.4.7...v0.4.8) (2026-06-26)
+
+
+### Bug Fixes
+
+* strip question marks from titles explicitly ([a816283](https://github.com/akamboj/Show-Saver/commit/a81628311a7774e3181ea1b7f9c4e0f79c43af6b))
+
 ## [0.4.7](https://github.com/akamboj/Show-Saver/compare/v0.4.6...v0.4.7) (2026-06-20)
 
 
