@@ -28,8 +28,13 @@ activityOverlay.addEventListener('click', closePanel);
 let connectionLost = false;
 let prevDownloadingIds = new Set();
 let pendingJob = null;
+let seenCompletedJobIds = null; // null until the first /queue poll has been processed
 const connectionToast = document.getElementById('connectionError');
 const SAFE_STATUS_CLASSES = new Set(['pending', 'queued', 'downloading', 'completed', 'failed']);
+const RELEASES_MAX_CARDS = 9;
+const RELEASES_POLL_INTERVAL_MS = 2000;
+const RELEASES_POLL_MAX = 30;
+let releasesPollTimer = null;
 const PLACEHOLDER_THUMB = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 320 180'%3E%3Crect fill='%232a2a2a' width='320' height='180'/%3E%3Crect x='100' y='45' width='120' height='75' rx='4' fill='none' stroke='%23555' stroke-width='4'/%3E%3Crect x='110' y='55' width='100' height='55' fill='%23333'/%3E%3Crect x='140' y='120' width='40' height='8' fill='%23555'/%3E%3Crect x='130' y='128' width='60' height='6' rx='2' fill='%23555'/%3E%3C/svg%3E";
 
 function clearAndAppend(parent, ...nodes) {
@@ -210,6 +215,16 @@ async function updateQueueStatus() {
                 openPanel();
             }
             prevDownloadingIds = currentIds;
+
+            // When a download for a visible release card finishes, re-fetch the
+            // releases once so the "in library" badge reflects the new file.
+            const newlyCompleted = seenCompletedJobIds
+                ? data.completed.filter(c => !seenCompletedJobIds.has(c.id))
+                : [];
+            if (newlyCompleted.some(c => findReleaseCard(c.url))) {
+                refreshReleaseCards();
+            }
+            seenCompletedJobIds = new Set(data.completed.map(c => c.id));
         }
     } catch (error) {
         console.error('Failed to update queue status:', error);
@@ -291,6 +306,26 @@ function formatDuration(seconds) {
     return `${mins}:${secs.toString().padStart(2, '0')}`;
 }
 
+// Find-or-create a badge <span> inside a release thumbnail.
+function ensureBadge(thumbnail, className) {
+    let badge = thumbnail.querySelector(`.${className}`);
+    if (!badge) {
+        badge = makeElement('span', className);
+        thumbnail.appendChild(badge);
+    }
+    return badge;
+}
+
+function setInLibraryBadge(thumbnail, inLibrary) {
+    if (inLibrary === true) {
+        const badge = ensureBadge(thumbnail, 'release-in-library');
+        badge.textContent = '\u2713';
+        badge.title = 'In Sonarr library';
+    } else {
+        thumbnail.querySelector('.release-in-library')?.remove();
+    }
+}
+
 function renderReleases(videos) {
     if (!videos || videos.length === 0) {
         clearAndAppend(releasesGrid, makeMessage('empty-releases', 'No releases available'));
@@ -316,6 +351,7 @@ function renderReleases(videos) {
         if (video.duration) {
             thumbnail.appendChild(makeElement('span', 'release-duration', formatDuration(video.duration)));
         }
+        setInLibraryBadge(thumbnail, video.in_library);
 
         info.append(
             makeElement('div', 'release-show', video.show_name || ''),
@@ -328,16 +364,17 @@ function renderReleases(videos) {
     clearAndAppend(releasesGrid, ...cards);
 }
 
-async function fetchNewReleases() {
+async function fetchNewReleases(forceRefresh = false) {
     clearAndAppend(releasesGrid, makeMessage('loading-releases', 'Loading releases...'));
     refreshReleasesBtn.classList.add('spinning');
 
     try {
-        const response = await fetch('/dropout/new-releases');
+        const endpoint = forceRefresh ? '/dropout/new-releases?refresh=true' : '/dropout/new-releases';
+        const response = await fetch(endpoint);
         const data = await response.json();
 
         if (data.success) {
-            const limitedVideos = data.videos.slice(0, 9);
+            const limitedVideos = data.videos.slice(0, RELEASES_MAX_CARDS);
             renderReleases(limitedVideos);
             startReleasesPolling(limitedVideos);
         } else {
@@ -350,10 +387,6 @@ async function fetchNewReleases() {
         refreshReleasesBtn.classList.remove('spinning');
     }
 }
-
-let releasesPollTimer = null;
-const RELEASES_POLL_INTERVAL_MS = 2000;
-const RELEASES_POLL_MAX = 30;
 
 function allCardsSettled(videos) {
     // A card is settled once we have a show_name OR yt-dlp has been tried
@@ -372,27 +405,37 @@ function startReleasesPolling(initialVideos) {
     let polls = 0;
     releasesPollTimer = setInterval(async () => {
         polls += 1;
-        try {
-            const response = await fetch('/dropout/new-releases');
-            const data = await response.json();
-            if (!data.success) return;
-
-            const videos = data.videos.slice(0, 9);
-            videos.forEach(v => updateReleaseCard(v.url, v));
-
-            if (allCardsSettled(videos) || polls >= RELEASES_POLL_MAX) {
-                clearInterval(releasesPollTimer);
-                releasesPollTimer = null;
-            }
-        } catch (err) {
-            console.error('Releases poll failed:', err);
+        const videos = await refreshReleaseCards();
+        if ((videos && allCardsSettled(videos)) || polls >= RELEASES_POLL_MAX) {
+            clearInterval(releasesPollTimer);
+            releasesPollTimer = null;
         }
     }, RELEASES_POLL_INTERVAL_MS);
 }
 
-function updateReleaseCard(url, info) {
-    const card = [...releasesGrid.querySelectorAll('.release-card')]
+function findReleaseCard(url) {
+    return [...releasesGrid.querySelectorAll('.release-card')]
         .find(candidate => candidate.dataset.url === url);
+}
+
+// Re-fetch releases (unforced) and update visible cards in place.
+// Returns the fetched videos, or null on failure.
+async function refreshReleaseCards() {
+    try {
+        const response = await fetch('/dropout/new-releases');
+        const data = await response.json();
+        if (!data.success) return null;
+        const videos = data.videos.slice(0, RELEASES_MAX_CARDS);
+        videos.forEach(v => updateReleaseCard(v.url, v));
+        return videos;
+    } catch (error) {
+        console.error('Failed to refresh release cards:', error);
+        return null;
+    }
+}
+
+function updateReleaseCard(url, info) {
+    const card = findReleaseCard(url);
     if (!card) return;
 
     // Update thumbnail
@@ -416,13 +459,13 @@ function updateReleaseCard(url, info) {
     // Update duration
     const thumbnailDiv = card.querySelector('.release-thumbnail');
     if (info.duration && thumbnailDiv) {
-        let durationSpan = thumbnailDiv.querySelector('.release-duration');
-        if (!durationSpan) {
-            durationSpan = document.createElement('span');
-            durationSpan.className = 'release-duration';
-            thumbnailDiv.appendChild(durationSpan);
-        }
-        durationSpan.textContent = formatDuration(info.duration);
+        ensureBadge(thumbnailDiv, 'release-duration').textContent = formatDuration(info.duration);
+    }
+
+    // Update Sonarr library badge; null means "unknown right now" (e.g. Sonarr
+    // unreachable), so leave whatever badge is already showing alone.
+    if (thumbnailDiv && info.in_library != null) {
+        setInLibraryBadge(thumbnailDiv, info.in_library);
     }
 
     // Mark card as loaded
@@ -447,7 +490,7 @@ async function queueRelease(url) {
 }
 
 // Event listeners for releases panel
-refreshReleasesBtn.addEventListener('click', fetchNewReleases);
+refreshReleasesBtn.addEventListener('click', () => fetchNewReleases(true));
 
 // Load releases on page load
 fetchNewReleases();

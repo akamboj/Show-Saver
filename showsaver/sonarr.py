@@ -1,6 +1,18 @@
 import requests
+import threading
 import time
+from collections.abc import Callable
+from typing import Any
+
 from showsaver.env import SONARR_URL, SONARR_API_KEY
+from showsaver.text import title_match_key
+
+# Short-lived cache for read-only lookups (series list, per-series episode lists).
+SONARR_CACHE_TTL = 60  # seconds
+LOOKUP_TIMEOUT = 5  # seconds; read-only lookups must stay short since the frontend polls them
+_cache: dict[str, tuple[float, Any]] = {}
+_cache_gen = 0  # bumped by clear_cache() so in-flight fetches don't resurrect stale data
+_cache_lock = threading.Lock()
 
 
 def is_sonarr_enabled() -> bool:
@@ -16,52 +28,147 @@ def _get_headers() -> dict[str, str]:
     }
 
 
+def clear_cache() -> None:
+    """Drop all cached Sonarr lookups, including the result of any fetch in flight."""
+    global _cache_gen
+    with _cache_lock:
+        _cache.clear()
+        _cache_gen += 1
+
+
+def _cached(key: str, fetch: Callable[[], Any]) -> Any:
+    """
+    Return the cached value for key if fresh, otherwise fetch() and cache it.
+
+    Failures are cached as None too, so a down Sonarr stalls one request per TTL
+    rather than every poll. The lock isn't held during fetch(); a clear_cache()
+    mid-fetch discards that fetch's result instead of storing it.
+    """
+    now = time.time()
+    with _cache_lock:
+        entry = _cache.get(key)
+        if entry and now - entry[0] < SONARR_CACHE_TTL:
+            return entry[1]
+        gen = _cache_gen
+    try:
+        value = fetch()
+    except requests.RequestException as e:
+        print(f"Sonarr: lookup '{key}' failed: {e}")
+        value = None
+    with _cache_lock:
+        if _cache_gen == gen:
+            _cache[key] = (now, value)
+    return value
+
+
 def get_all_series():
     """Fetch all series from Sonarr library."""
     url = f"{SONARR_URL.rstrip('/')}/api/v3/series"
-    response = requests.get(url, headers=_get_headers(), timeout=10)
+    response = requests.get(url, headers=_get_headers(), timeout=LOOKUP_TIMEOUT)
     response.raise_for_status()
     return response.json()
 
 
-def find_series_by_name(show_name: str, override_name: str|None=None) -> int | None:
-    """
-    Find a series ID in Sonarr by show name.
+def get_series_episodes(series_id: int) -> list[dict]:
+    """Fetch every episode Sonarr knows about for a series (includes hasFile)."""
+    url = f"{SONARR_URL.rstrip('/')}/api/v3/episode"
+    response = requests.get(url, headers=_get_headers(), params={"seriesId": series_id}, timeout=LOOKUP_TIMEOUT)
+    response.raise_for_status()
+    return response.json()
 
-    Args:
-        show_name: The show name from yt-dlp metadata
-        overrides: Dict of show name overrides (original -> corrected)
+
+def _match_series(series_list: list[dict], show_name: str, override_name: str | None = None) -> int | None:
+    """
+    Pick a series ID out of a Sonarr series list by name.
+
+    Passes, all case-insensitive: exact match on the override name (if any),
+    exact match on the original name, then substring match on the override name.
+    """
+    titles = [(series.get("title", "").lower(), series.get("id")) for series in series_list]
+    search_name = (override_name or show_name).lower()
+
+    for candidate in (search_name, show_name.lower()):
+        for title, series_id in titles:
+            if title == candidate:
+                return series_id
+
+    for title, series_id in titles:
+        if search_name in title:
+            return series_id
+    return None
+
+
+def find_series_by_name(show_name: str, override_name: str|None=None) -> int | None:
+    """Uncached series lookup used by the download path."""
+    return _match_series(get_all_series(), show_name, override_name)
+
+
+def _match_episode(
+    episodes: list[dict],
+    season_number: int | None,
+    episode_number: int | None,
+    title: str | None,
+) -> dict | None:
+    """
+    Find the Sonarr episode matching a Dropout release.
+
+    Matches on (seasonNumber, episodeNumber) when both are known and not the
+    S00E00 placeholder the processor assigns to specials; otherwise falls back
+    to a case/punctuation-insensitive title match.
+    """
+    if season_number is not None and episode_number is not None and (season_number, episode_number) != (0, 0):
+        for episode in episodes:
+            if episode.get("seasonNumber") == season_number and episode.get("episodeNumber") == episode_number:
+                return episode
+        return None
+
+    key = title_match_key(title)
+    if not key:
+        return None
+    for episode in episodes:
+        if title_match_key(episode.get("title")) == key:
+            return episode
+    return None
+
+
+def is_episode_in_library(
+    show_name: str,
+    override_name: str | None,
+    season_number: int | None,
+    episode_number: int | None,
+    title: str | None,
+) -> bool | None:
+    """
+    Check whether Sonarr already has a file for an episode.
 
     Returns:
-        Series ID if found, None otherwise
+        True if the matched episode has a file, False if it is known but has no
+        file, None if Sonarr is disabled, the series/episode could not be
+        matched, or the lookup failed. Never raises.
     """
-    search_name = show_name
-    if override_name:
-        # Apply override if present
-        search_name = override_name
+    try:
+        if not is_sonarr_enabled():
+            return None
 
+        series_list = _cached("series", get_all_series)
+        if series_list is None:
+            return None
 
-    series_list = get_all_series()
+        series_id = _match_series(series_list, show_name, override_name)
+        if series_id is None:
+            return None
 
-    # Case-insensitive search
-    search_name_lower = search_name.lower()
-    for series in series_list:
-        if series.get("title", "").lower() == search_name_lower:
-            return series.get("id")
+        episodes = _cached(f"episodes:{series_id}", lambda: get_series_episodes(series_id))
+        if episodes is None:
+            return None
 
-    # If override was applied but not found, try original name
-    if show_name != search_name:
-        show_name_lower = show_name.lower()
-        for series in series_list:
-            if series.get("title", "").lower() == show_name_lower:
-                return series.get("id")
-            
-    # Try partial name search
-    for series in series_list:
-        if search_name_lower in series.get("title", "").lower():
-            return series.get("id")
-
-    return None
+        episode = _match_episode(episodes, season_number, episode_number, title)
+        if episode is None:
+            return None
+        return bool(episode.get("hasFile"))
+    except Exception as e:
+        print(f"Sonarr: episode lookup failed for '{show_name}': {e}")
+        return None
 
 
 def rescan_series(series_id: int):
@@ -86,10 +193,10 @@ def rescan_series(series_id: int):
 
 def rename_series(series_ids):
     """
-    Trigger a rename for a specific series in Sonarr.
+    Trigger a rename for specific series in Sonarr.
 
     Args:
-        series_id: The Sonarr series ID
+        series_ids: List of Sonarr series IDs
 
     Returns:
         Command response from Sonarr
@@ -110,17 +217,17 @@ def wait_for_command(command_id, timeout: int=30, poll_interval: int=3):
 
     Args:
         command_id: The command ID returned by a previous POST to /api/v3/command
-        timeout: Maximum seconds to wait (default 120)
+        timeout: Maximum seconds to wait (default 30)
         poll_interval: Seconds between polls (default 3)
 
     Returns:
-        Final status string, e.g. 'completed', 'failed', 'aborted'
+        Final status string ('completed', 'failed', 'aborted'), or 'timeout'.
     """
     url = f"{SONARR_URL.rstrip('/')}/api/v3/command/{command_id}"
     terminal = {'completed', 'failed', 'aborted'}
     deadline = time.monotonic() + timeout
     while time.monotonic() < deadline:
-        response = requests.get(url, headers=_get_headers(), timeout=10)
+        response = requests.get(url, headers=_get_headers(), timeout=LOOKUP_TIMEOUT)
         response.raise_for_status()
         status = response.json().get('status', '')
         if status in terminal:
@@ -131,11 +238,12 @@ def wait_for_command(command_id, timeout: int=30, poll_interval: int=3):
 
 def refresh_and_rescan_series(show_name: str, override_name: str|None=None, do_rename: bool=False) -> bool:
     """
-    Main entry point: find series and trigger rescan.
+    Main entry point: find series, trigger rescan, wait for it, refresh the lookup cache.
 
     Args:
         show_name: The show name from yt-dlp metadata
         override_name: Potential overriden name of show
+        do_rename: Also trigger a RenameSeries after the rescan finishes
 
     Returns:
         True if rescan was triggered, False otherwise
@@ -153,9 +261,15 @@ def refresh_and_rescan_series(show_name: str, override_name: str|None=None, do_r
     command_id = rescan_ret.get('id')
     print(f"Sonarr: Triggered rescan for series '{show_name}' (ID: {series_id})")
 
-    if command_id and do_rename:
-        final_status = wait_for_command(command_id)
-        print(f"Sonarr: Rescan finished with status '{final_status}' for '{show_name}'")
+    if command_id:
+        try:
+            final_status = wait_for_command(command_id)
+            print(f"Sonarr: Rescan finished with status '{final_status}' for '{show_name}'")
+        except requests.RequestException as e:
+            print(f"Sonarr: Could not confirm rescan completion for '{show_name}': {e}")
+
+    # Drop cached series/episode lists so in_library lookups see the imported file
+    clear_cache()
 
     if do_rename:
         rename_series([series_id])

@@ -1,6 +1,7 @@
+import pytest
 import yt_dlp
 
-from showsaver.text import normalize_title
+from showsaver.text import normalize_title, title_match_key
 
 
 def test_normalize_title_replaces_fullwidth_double_quote():
@@ -30,3 +31,18 @@ def test_normalize_title_handles_fullwidth_quotes_left_by_ytdlp_filename_sanitiz
 
     assert filename == 'Some \uff02Quoted\uff02 Title.mkv'
     assert normalize_title(filename) == 'Some \'Quoted\' Title.mkv'
+
+
+class TestTitleMatchKey:
+    @pytest.mark.parametrize('title, expected', [
+        ('Last Looks: "Sam"?', 'lastlookssam'),  # lowercased, punctuation stripped
+        ('The  Big - One', 'thebigone'),          # whitespace and hyphens ignored
+        (None, ''),
+        ('', ''),
+    ])
+    def test_key(self, title, expected):
+        assert title_match_key(title) == expected
+
+    def test_normalized_and_raw_titles_share_a_key(self):
+        raw = 'Last Looks: "Sam"?'
+        assert title_match_key(normalize_title(raw)) == title_match_key(raw)

@@ -1,3 +1,5 @@
+from unittest.mock import MagicMock
+
 import pytest
 
 import showsaver.processors.dropout as dropout
@@ -154,6 +156,50 @@ class TestProcessInfoDictNoMatch:
         processor.process_info_dict(info)
         assert 'season_number' not in info or info['season_number'] == 0
 
+    def test_null_season_number_does_not_crash(self, processor):
+        info = {
+            'series': 'Dimension 20',
+            'title': 'Episode',
+            'season_number': None,
+            'episode_number': None,
+        }
+        processor.process_info_dict(info)
+        assert info['season_number'] is None
+
+
+class TestProcessDlpOpts:
+    @pytest.mark.parametrize('season_number, expected', [(30, 'S30E'), (None, 'S0E')])
+    def test_dimension_20_template_uses_season_number(self, processor, season_number, expected):
+        info = {'series': 'Dimension 20', 'title': 'Episode', 'season_number': season_number}
+        opts = {}
+        processor.process_dlp_opts(opts, info)
+        assert expected in opts['outtmpl']['default']
+        assert 'SNone' not in opts['outtmpl']['default']
+
+
+class TestFetchAndStoreEpisodeInfo:
+    def test_persists_raw_season_and_episode_numbers(self, monkeypatch):
+        info = {
+            'title': 'Some Episode',
+            'webpage_url': 'https://watch.dropout.tv/videos/some-episode',
+            'series': 'Dimension 20',
+            'season_number': 30,
+            'episode_number': 5,
+        }
+        ydl = MagicMock()
+        ydl.__enter__.return_value.extract_info.return_value = info
+        monkeypatch.setattr(dropout.yt_dlp, 'YoutubeDL', lambda _opts: ydl)
+        captured = {}
+        monkeypatch.setattr(dropout.database, 'upsert_dropout_episode', lambda **kw: captured.update(kw))
+
+        result = dropout.fetch_and_store_episode_info('https://watch.dropout.tv/videos/some-episode')
+
+        assert (result['season_number'], result['episode_number']) == (30, 5)
+        # Raw yt-dlp value is stored; the D20 remap happens at read time
+        assert (captured['season_number'], captured['episode_number']) == (30, 5)
+        assert captured['url_path'] == 'some-episode'
+        assert captured['show_name'] == 'Dimension 20'
+
 
 # ---------------------------------------------------------------------------
 # Dimension 20 url correction
@@ -221,6 +267,20 @@ class TestGetD20SeasonMap:
         monkeypatch.setattr(dropout.requests, 'get', lambda *a, **k: _Resp(200, '<urlset></urlset>'))
         assert dropout._get_d20_season_map(force_refresh=True) == good
         assert dropout._d20_season_cache['data'] == good
+
+    def test_failed_fetch_is_not_retried_within_ttl(self, monkeypatch):
+        # The badge path hits this on every poll; an unreachable sitemap must not
+        # cost a 30 s request each time.
+        calls = []
+
+        def boom(*a, **k):
+            calls.append(a)
+            raise ConnectionError('offline')
+        monkeypatch.setattr(dropout.requests, 'get', boom)
+
+        assert dropout._get_d20_season_map() == {}
+        assert dropout._get_d20_season_map() == {}
+        assert len(calls) == 1
 
     def test_empty_map_is_negatively_cached(self, monkeypatch):
         # An empty map is falsy, so a truthiness check on the cache would re-download
@@ -314,3 +374,4 @@ class TestFindCorrectedUrl:
         monkeypatch.setattr(dropout, 'get_metadata', lambda url: {'series': 'Dimension 20'})
 
         assert processor.find_corrected_url(D20_URL, {'series': 'Dimension 20: Gladlands'}) is None
+

@@ -218,10 +218,10 @@ def copy_to_destination(
     episode_filename = normalize_title(os.path.basename(show_path))
 
     if processor:
-        new_show_name = processor.process_show_name(show_name)
-        if new_show_name != show_name:
-            episode_filename = episode_filename.replace(show_name, new_show_name)
-            show_name = new_show_name
+        override_name = processor.get_show_name_override(show_name)
+        if override_name:
+            episode_filename = episode_filename.replace(show_name, override_name)
+            show_name = override_name
 
     full_destination_path = os.path.join(base_destination_path, show_name, season_folder)
     full_episode_path = os.path.join(full_destination_path, episode_filename)
@@ -261,10 +261,10 @@ def process_url(
     try:
         show_name = info_dict.get('series')
         if show_name:
-            override_name = show_name
+            override_name = None
             should_trigger_rename = False
             if processor:
-                override_name = processor.process_show_name(show_name)
+                override_name = processor.get_show_name_override(show_name)
                 should_trigger_rename = processor.should_trigger_rename(info_dict)
             refresh_and_rescan_series(show_name, override_name, should_trigger_rename)
     except Exception as e:

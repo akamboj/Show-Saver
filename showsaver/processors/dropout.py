@@ -1,4 +1,5 @@
 import showsaver.database as database
+import showsaver.sonarr as sonarr
 from showsaver.downloader import BASE_YT_OPTS, get_metadata
 from showsaver.processors import Processor
 from showsaver.special_patterns import get_special_patterns
@@ -24,6 +25,7 @@ METADATA_CACHE_TTL = 7 * 24 * 60 * 60 # 1 week in seconds
 
 DROPOUT_SITEMAP_URL = 'https://watch.dropout.tv/sitemap.xml'
 D20_COMPLETE_SERIES_URL = 'https://watch.dropout.tv/dimension-20-the-complete-series'
+D20_SERIES_NAME = 'Dimension 20'
 _D20_SITEMAP_RE = re.compile(r'dimension-20-the-complete-series-season-(\d+)/videos/([a-z0-9-]+)')
 _d20_season_cache = {
     'data': None,
@@ -39,7 +41,7 @@ SHOW_NAME_OVERRIDES = {
 class DropoutProcessor(Processor):
     def process_info_dict(self, info_dict) -> None:
 
-        season_number = info_dict.get('season_number', 0)
+        season_number = info_dict.get('season_number') or 0
         if self.treat_as_special(info_dict):
             info_dict['season_number'] = 0
             info_dict['episode_number'] = 0
@@ -63,15 +65,13 @@ class DropoutProcessor(Processor):
             dlp_opts['outtmpl'] = {'default' : '%(series)s - S00E00 - %(title)s WEBDL-1080p.%(ext)s'}
         elif self.__is_dim20(info_dict) or self.__is_adventuring_party(info_dict):
             # Because of the season number modification we have to specify it directly in the file name template
-            season_number = info_dict.get('season_number', 0)
+            season_number = info_dict.get('season_number') or 0
             dlp_opts['outtmpl'] = {'default' : f'%(series)s - S{season_number}E%(episode_number)02d - %(title)s WEBDL-1080p.%(ext)s'}
 
 
-    def process_show_name(self, show_name: str) -> str:
+    def get_show_name_override(self, show_name: str) -> str | None:
 
-        if show_name in SHOW_NAME_OVERRIDES:
-            return SHOW_NAME_OVERRIDES[show_name]
-        return show_name
+        return SHOW_NAME_OVERRIDES.get(show_name)
 
 
     def should_trigger_rename(self, info_dict) -> bool:
@@ -84,19 +84,30 @@ class DropoutProcessor(Processor):
         return False
 
 
+    def find_d20_season(self, slug: str, info_dict, refresh_on_miss: bool = True) -> int | None:
+        """
+        Complete-series season for a Dimension 20 campaign episode slug, from the sitemap map.
+        Returns None when the series is not a campaign or the slug is unknown.
+        """
+        if not _is_d20_campaign(info_dict):
+            return None
+
+        season = _get_d20_season_map().get(slug)
+        if season is None and refresh_on_miss:
+            # The cached map can be up to D20_SEASON_CACHE_TTL stale, so a miss is most
+            # likely a newly published episode. Refresh once before giving up.
+            season = _get_d20_season_map(force_refresh=True).get(slug)
+        return season
+
+
     def find_corrected_url(self, show_url: str, info_dict) -> tuple[str, dict] | None:
 
-        if 'Dimension 20:' not in (info_dict.get('series') or ''):
+        if not _is_d20_campaign(info_dict):
             return None
 
         print(f'Attempting to correct url: {show_url}')
         slug = _get_url_path(show_url)
-        season_map = _get_d20_season_map()
-        season = season_map.get(slug)
-        if season is None:
-            # The cached map can be up to D20_SEASON_CACHE_TTL stale, so a miss is most
-            # likely a newly published episode. Refresh once before giving up.
-            season = _get_d20_season_map(force_refresh=True).get(slug)
+        season = self.find_d20_season(slug, info_dict)
         if season is None:
             print('Failed to find corrected Dimension 20 url.')
             return None
@@ -128,7 +139,7 @@ class DropoutProcessor(Processor):
     def __is_dim20(self, info_dict) -> bool:
 
         series = info_dict.get('series', '')
-        if 'Dimension 20' == series:
+        if D20_SERIES_NAME == series:
             return True
         return False
 
@@ -210,25 +221,30 @@ def _get_d20_season_map(force_refresh: bool = False) -> dict[str, int]:
     if not force_refresh and cached is not None and (time.time() - fetched_at < D20_SEASON_CACHE_TTL):
         return cached
 
+    season_map = {}
     try:
         response = requests.get(DROPOUT_SITEMAP_URL, timeout=30)
         if response.status_code != 200:
             print(f'Failed to fetch Dropout sitemap. Status code {response.status_code}')
-            return cached or {}
-        season_map = {
-            slug: int(season) for season, slug in _D20_SITEMAP_RE.findall(response.text)
-        }
-        if not season_map:
-            # A 200 that parses to nothing means the sitemap changed shape, not that the
-            # collection is empty. Keep whatever we already had.
-            print('Dropout sitemap contained no Dimension 20 complete-series entries.')
-            return cached or {}
-        _d20_season_cache['data'] = season_map
-        _d20_season_cache['timestamp'] = time.time()
-        return season_map
+        else:
+            season_map = {
+                slug: int(season) for season, slug in _D20_SITEMAP_RE.findall(response.text)
+            }
+            if not season_map:
+                # A 200 that parses to nothing means the sitemap changed shape, not that
+                # the collection is empty.
+                print('Dropout sitemap contained no Dimension 20 complete-series entries.')
     except Exception as e:
         print(f'Failed to fetch Dropout sitemap: {e}')
-        return cached or {}
+    # A failure keeps the previous map but still restamps it, so an unreachable
+    # sitemap is retried once per TTL rather than on every lookup.
+    _d20_season_cache['data'] = season_map or cached or {}
+    _d20_season_cache['timestamp'] = time.time()
+    return _d20_season_cache['data']
+
+
+def _is_d20_campaign(info_dict) -> bool:
+    return 'Dimension 20:' in (info_dict.get('series') or '')
 
 
 def _get_url_path(url: str) -> str:
@@ -248,7 +264,38 @@ def _update_database_episode(video_info: dict) -> None:
         show_name=video_info.get('show_name', ''),
         episode_title=video_info.get('title', ''),
         thumbnail=video_info.get('thumbnail', ''),
-        duration_secs=video_info.get('duration', -1)
+        duration_secs=video_info.get('duration', -1),
+        season_number=video_info.get('season_number'),
+        episode_number=video_info.get('episode_number'),
+    )
+
+
+def _annotate_in_library(video: dict, processor: DropoutProcessor) -> None:
+    """Set video['in_library'] via Sonarr, using the processor's season/episode remaps."""
+    show_name = video.get('show_name') or ''
+    if not show_name:
+        video['in_library'] = None
+        return
+
+    info = {
+        'series': show_name,
+        'title': video.get('title') or '',
+        'season_number': video.get('season_number'),
+        'episode_number': video.get('episode_number'),
+    }
+    # Map a D20 campaign row onto 'Dimension 20' at its complete-series season; the
+    # episode number and title are identical, so the sitemap map is enough (no yt-dlp).
+    season = processor.find_d20_season(_get_url_path(video.get('url') or ''), info, refresh_on_miss=False)
+    if season is not None:
+        info['series'] = D20_SERIES_NAME
+        info['season_number'] = season
+    processor.process_info_dict(info)
+    video['in_library'] = sonarr.is_episode_in_library(
+        info['series'],
+        processor.get_show_name_override(info['series']),
+        info['season_number'],
+        info['episode_number'],
+        info['title'],
     )
 
 
@@ -257,9 +304,15 @@ def get_new_releases(force_refresh: bool=False):
     Get list of new releases from Dropout using yt-dlp.
     Returns dict with 'success', 'videos' list, 'cached' flag.
     """
+    if force_refresh:
+        sonarr.clear_cache()
+
+    processor = DropoutProcessor()
     if not force_refresh and _new_releases_cache['data'] and (time.time() - _new_releases_cache['timestamp'] < CACHE_TTL):
         fetched = [row for row in (database.get_dropout_episode(_get_url_path(u)) for u in _new_releases_cache['data']) if row]
         if fetched:
+            for video in fetched:
+                _annotate_in_library(video, processor)
             return {'success': True, 'videos': fetched, 'cached': True}
     
     try:
@@ -281,7 +334,10 @@ def get_new_releases(force_refresh: bool=False):
                 **v,
                 'show_name': row.get('show_name', ''),
                 'metadata_fetched_at': metadata_fetched_at,
+                'season_number': row.get('season_number'),
+                'episode_number': row.get('episode_number'),
             }
+            _annotate_in_library(merged, processor)
             videos.append(merged)
 
             if not merged['show_name'] and (time.time() - (metadata_fetched_at or 0)) > METADATA_CACHE_TTL:
@@ -312,6 +368,8 @@ def fetch_and_store_episode_info(episode_url: str) -> dict[str, Any]:
         'description': info.get('description'),
         'id': info.get('id'),
         'show_name': info.get('series', ''),
+        'season_number': info.get('season_number'),
+        'episode_number': info.get('episode_number'),
     }
     _update_database_episode(episode_info)
     return episode_info
