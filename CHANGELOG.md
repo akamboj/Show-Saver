@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.6.0](https://github.com/akamboj/Show-Saver/compare/v0.5.3...v0.6.0) (2026-09-29)
+
+
+### Features
+
+* Add checkmark to new releases if in library ([#73](https://github.com/akamboj/Show-Saver/issues/73)) ([23c278e](https://github.com/akamboj/Show-Saver/commit/23c278ee349062e4b5497b8d58d343685f94fd32))
+
 ## [0.5.3](https://github.com/akamboj/Show-Saver/compare/v0.5.2...v0.5.3) (2026-09-18)
 
 
