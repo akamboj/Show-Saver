@@ -360,7 +360,7 @@ def fetch_and_store_episode_info(episode_url: str) -> dict[str, Any]:
         'skip_download': True,
         'quiet': True,
     }
-    with yt_dlp.YoutubeDL(opts) as ydl:
+    with yt_dlp.YoutubeDL(opts) as ydl:  # pyright: ignore[reportArgumentType]
         info = ydl.extract_info(episode_url, download=False)
     
     episode_info = {
