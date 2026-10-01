@@ -120,11 +120,11 @@ def get_metadata(show_url: str) -> dict | None:
             YT_REPLACE_COLON_ACTION
         ]
     }
-    with yt_dlp.YoutubeDL(dlp_opts) as yt:
+    with yt_dlp.YoutubeDL(dlp_opts) as yt:  # pyright: ignore[reportArgumentType]
         print('Downloading metadata for url: ' + show_url)
         info_dict = yt.extract_info(show_url)
         print('Metadata download complete!')
-        return info_dict
+        return info_dict # pyright: ignore[reportReturnType]
 
 
 def download_show(
@@ -199,7 +199,7 @@ def download_show(
     if processor:
         processor.process_dlp_opts(dlp_opts, info_dict)
     info_dict['title'] = normalize_title(info_dict.get('title', ''))
-    with yt_dlp.YoutubeDL(dlp_opts) as yt:
+    with yt_dlp.YoutubeDL(dlp_opts) as yt:  # pyright: ignore[reportArgumentType]
         yt.download(show_url)
         show_file_name = yt.evaluate_outtmpl(dlp_opts['outtmpl']['default'], info_dict)
     show_path = os.path.abspath(os.path.join(dlp_opts['paths']['home'], show_file_name))
@@ -244,7 +244,7 @@ def process_url(
     info_dict = get_metadata(show_url)
 
     # If we have a playlist return the urls to be processed individually
-    if info_dict.get('_type') == 'playlist':
+    if info_dict and info_dict.get('_type') == 'playlist':
         return [e['url'] for e in info_dict.get('entries', []) if e.get('url')]
 
     if processor:
@@ -259,14 +259,15 @@ def process_url(
 
     # Trigger Sonarr rescan (optional)
     try:
-        show_name = info_dict.get('series')
-        if show_name:
-            override_name = None
-            should_trigger_rename = False
-            if processor:
-                override_name = processor.get_show_name_override(show_name)
-                should_trigger_rename = processor.should_trigger_rename(info_dict)
-            refresh_and_rescan_series(show_name, override_name, should_trigger_rename)
+        if info_dict:
+            show_name = info_dict.get('series')
+            if show_name:
+                override_name = None
+                should_trigger_rename = False
+                if processor:
+                    override_name = processor.get_show_name_override(show_name)
+                    should_trigger_rename = processor.should_trigger_rename(info_dict)
+                refresh_and_rescan_series(show_name, override_name, should_trigger_rename)
     except Exception as e:
         print(f"Sonarr integration warning: {e}")
 

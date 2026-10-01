@@ -183,10 +183,13 @@ def _get_new_releases_bs() -> list[dict[str, Any]] | None:
                     img = list_item.find('img')
                     thumbnail = img['src'] if img else None
                     link = list_item.find('a', href=True)
+                    strong = list_item.find('strong')
+                    if link is None or strong is None:
+                        continue
 
-                    title = list_item.find('strong')['title']
-                    url = link['href'].replace('/new-releases', '')
-                    id = int(list_item['data-item-id'])
+                    title = str(strong['title'])
+                    url = str(link['href']).replace('/new-releases', '')
+                    id = int(str(list_item['data-item-id']))
 
                     duration_container = list_item.find('div', class_='duration-container')
                     if duration_container:
@@ -357,7 +360,7 @@ def fetch_and_store_episode_info(episode_url: str) -> dict[str, Any]:
         'skip_download': True,
         'quiet': True,
     }
-    with yt_dlp.YoutubeDL(opts) as ydl:
+    with yt_dlp.YoutubeDL(opts) as ydl:  # pyright: ignore[reportArgumentType]
         info = ydl.extract_info(episode_url, download=False)
     
     episode_info = {
