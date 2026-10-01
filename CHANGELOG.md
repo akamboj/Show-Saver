@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.6.1](https://github.com/akamboj/Show-Saver/compare/v0.6.0...v0.6.1) (2026-10-01)
+
+
+### Bug Fixes
+
+* use yt-dlps normalize instead of our version ([8309c53](https://github.com/akamboj/Show-Saver/commit/8309c537b1f813eb8baf19c74238a2b8eab54dab))
+
 ## [0.6.0](https://github.com/akamboj/Show-Saver/compare/v0.5.3...v0.6.0) (2026-09-29)
 
 
