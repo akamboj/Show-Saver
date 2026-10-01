@@ -198,11 +198,10 @@ def download_show(
     }
     if processor:
         processor.process_dlp_opts(dlp_opts, info_dict)
-    info_dict['title'] = normalize_title(info_dict.get('title', ''))
     with yt_dlp.YoutubeDL(dlp_opts) as yt:  # pyright: ignore[reportArgumentType]
         yt.download(show_url)
-        show_file_name = yt.evaluate_outtmpl(dlp_opts['outtmpl']['default'], info_dict)
-    show_path = os.path.abspath(os.path.join(dlp_opts['paths']['home'], show_file_name))
+        # prepare_filename applies the same sanitization yt-dlp used when writing the file
+        show_path = os.path.abspath(yt.prepare_filename(info_dict))
     return show_path
 
 

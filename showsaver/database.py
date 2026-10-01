@@ -2,7 +2,6 @@ import sqlite3
 import time
 
 from showsaver.env import DB_PATH
-from showsaver.text import DOUBLE_QUOTE, FULLWIDTH_DOUBLE_QUOTE, normalize_title
 
 
 def get_connection() -> sqlite3.Connection:
@@ -34,19 +33,12 @@ def init_db() -> None:
         for name, col_type in (('metadata_fetched_at', 'REAL'), ('season_number', 'INTEGER'), ('episode_number', 'INTEGER')):
             if name not in cols:
                 conn.execute(f"ALTER TABLE dropout_episodes ADD COLUMN {name} {col_type}")
-        conn.execute(
-            "UPDATE dropout_episodes SET title = replace(title, ?, ?) WHERE instr(title, ?) > 0",
-            (FULLWIDTH_DOUBLE_QUOTE, normalize_title(FULLWIDTH_DOUBLE_QUOTE), FULLWIDTH_DOUBLE_QUOTE),
-        )
-        conn.execute(
-            "UPDATE dropout_episodes SET title = replace(title, ?, ?) WHERE instr(title, ?) > 0",
-            (DOUBLE_QUOTE, normalize_title(DOUBLE_QUOTE), DOUBLE_QUOTE),
-        )
 
 
 def upsert_dropout_episode_basic(url_path: str, url: str, episode_title: str, thumbnail: str, duration_secs: int) -> None:
-    """Upsert scrape-time fields without touching show_name (preserves any yt-dlp-resolved value)."""
-    episode_title = normalize_title(episode_title)
+    """Upsert scrape-time fields without touching show_name (preserves any yt-dlp-resolved value).
+
+    Titles are stored raw (no filename sanitization) so the UI shows the original punctuation."""
     with get_connection() as conn:
         conn.execute("""
             INSERT INTO dropout_episodes (url_path, url, show_name, title, thumbnail, duration, fetched_at)
@@ -71,7 +63,6 @@ def upsert_dropout_episode(
     episode_number: int | None = None,
 ) -> None:
     now = time.time()
-    episode_title = normalize_title(episode_title)
     with get_connection() as conn:
         conn.execute("""
             INSERT INTO dropout_episodes (

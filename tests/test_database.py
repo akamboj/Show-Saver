@@ -52,10 +52,11 @@ class TestUpsertBasic:
         second = db.get_dropout_episode(URL_PATH)['fetched_at']
         assert second > first
 
-    def test_basic_normalizes_fullwidth_double_quotes_in_title(self, db):
-        db.upsert_dropout_episode_basic(URL_PATH, URL, 'Some \uff02Quoted\uff02 Title', THUMB, DURATION)
+    def test_basic_stores_title_verbatim(self, db):
+        raw = 'Last Looks: "Sam"? Sam\uff07s ＂Song＂'
+        db.upsert_dropout_episode_basic(URL_PATH, URL, raw, THUMB, DURATION)
         row = db.get_dropout_episode(URL_PATH)
-        assert row['title'] == 'Some \'Quoted\' Title'
+        assert row['title'] == raw
 
 
 class TestUpsertFull:
@@ -71,26 +72,11 @@ class TestUpsertFull:
         row = db.get_dropout_episode(URL_PATH)
         assert row['show_name'] == 'New Show'
 
-    def test_full_normalizes_fullwidth_double_quotes_in_title(self, db):
-        db.upsert_dropout_episode(URL_PATH, URL, 'Show', 'Some \uff02Quoted\uff02 Title', THUMB, DURATION)
+    def test_full_stores_title_verbatim(self, db):
+        raw = 'Last Looks: "Sam"? Sam\uff07s ＂Song＂'
+        db.upsert_dropout_episode(URL_PATH, URL, 'Show', raw, THUMB, DURATION)
         row = db.get_dropout_episode(URL_PATH)
-        assert row['title'] == 'Some \'Quoted\' Title'
-
-    def test_init_db_normalizes_existing_fullwidth_double_quotes(self, tmp_path, monkeypatch):
-        monkeypatch.setattr(database, 'DB_PATH', str(tmp_path / 'test.db'))
-        database.init_db()
-        database.upsert_dropout_episode(URL_PATH, URL, 'Show', TITLE, THUMB, DURATION)
-        with database.get_connection() as conn:
-            conn.execute("""
-                UPDATE dropout_episodes
-                SET title = ?
-                WHERE url_path = ?
-            """, ('Some \uff02Quoted\uff02 Title', URL_PATH))
-
-        database.init_db()
-
-        row = database.get_dropout_episode(URL_PATH)
-        assert row['title'] == 'Some \'Quoted\' Title'
+        assert row['title'] == raw
 
 
 class TestMetadataFetchedAt:
