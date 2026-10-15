@@ -9,6 +9,7 @@ from dataclasses import dataclass
 from enum import StrEnum
 from os import PathLike
 
+import showsaver.dropout_profile  # noqa: F401  (patches DropoutIE for the profile picker)
 from showsaver.env import (
     CONFIG_DIR, TMP_DIR, DO_CLEANUP, YTDLP_PROGRESS_LOG_INTERVAL
 )
