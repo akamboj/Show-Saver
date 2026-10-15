@@ -4,6 +4,8 @@ updates:
   # titled fix(deps): … — release-please counts that as a PATCH and queues
   # a release PR. Dev-only bumps (requirements-dev.txt) and github-actions
   # bumps don't ship, so they stay build(deps): and trigger no release.
+  # yt-dlp is checked daily in its own entry, since site extractors break
+  # often; everything else is weekly.
   - package-ecosystem: pip
     directory: /
     schedule:
@@ -12,13 +14,23 @@ updates:
       prefix: "fix"
       prefix-development: "build"
       include: "scope"
+    ignore:
+      - dependency-name: "yt-dlp"
     groups:
       python-deps:
         applies-to: version-updates
         patterns:
           - "*"
-        exclude-patterns:
-          - "yt-dlp"
+
+  - package-ecosystem: pip
+    directory: /
+    schedule:
+      interval: daily
+    allow:
+      - dependency-name: "yt-dlp"
+    commit-message:
+      prefix: "fix"
+      include: "scope"
 
   - package-ecosystem: github-actions
     directory: /
