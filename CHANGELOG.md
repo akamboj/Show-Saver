@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.6.2](https://github.com/akamboj/Show-Saver/compare/v0.6.1...v0.6.2) (2026-10-15)
+
+
+### Bug Fixes
+
+* Patch dropout login to handle profiles ([#79](https://github.com/akamboj/Show-Saver/issues/79)) ([07f4c16](https://github.com/akamboj/Show-Saver/commit/07f4c16eb9f670b686dd7aa996464c3a4ea88a12))
+
 ## [0.6.1](https://github.com/akamboj/Show-Saver/compare/v0.6.0...v0.6.1) (2026-10-01)
 
 
