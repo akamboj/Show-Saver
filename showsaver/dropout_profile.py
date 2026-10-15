@@ -7,11 +7,13 @@ page, so it fails with ``Unable to extract embed url``
 (https://github.com/yt-dlp/yt-dlp/issues/17823).
 
 This module patches ``DropoutIE._login`` so that, right after the stock login
-succeeds, it selects a profile the same way the browser does: a JSON ``POST`` to
-``/profile/login`` carrying the page's CSRF token. If ``/profile/pick`` no
-longer renders the picker (Dropout removes it, or upstream yt-dlp learns to
-handle it), the patch is a no-op. Remove this module once the upstream fix
-ships.
+runs with credentials, it selects a profile the same way the browser does: a
+JSON ``POST`` to ``/profile/login`` carrying the page's CSRF token. Selection is
+attempted even when the stock login reports an error, because a redirect to the
+picker page hides the ``user_has_subscription`` marker the stock check relies
+on. If ``/profile/pick`` no longer renders the picker (Dropout removes it, or
+upstream yt-dlp learns to handle it), the patch is a no-op. Remove this module
+once the upstream fix ships.
 
 Note: ``DropoutIE._real_extract`` skips ``_login`` entirely when a ``_session``
 cookie is already present (cookie-file auth). Show-Saver authenticates with
@@ -48,7 +50,9 @@ def select_profile(ie, display_id):
         ie.report_warning('Profile picker found but no CSRF token; cannot select a profile')
         return False
 
-    response = ie._request_webpage(
+    # _download_webpage (rather than _request_webpage) reads and releases the
+    # response so the pooled connection is not held until GC.
+    response = ie._download_webpage(
         PROFILE_LOGIN_URL, display_id, note=f'Selecting profile {PROFILE_INDEX}',
         errnote='Unable to select profile', fatal=False,
         data=json.dumps({'profile_index': PROFILE_INDEX}).encode(),
@@ -57,15 +61,22 @@ def select_profile(ie, display_id):
             'Referer': PICK_URL,
             'X-CSRF-Token': csrf_token,
         })
-    return bool(response)
+    return response is not False
 
 
 def _login_with_profile(self, display_id):
     err = _original_login(self, display_id)
-    if err:
-        # True (no credentials) or an error string: nothing to select.
+    if err is True:
+        # No credentials configured: nothing to select.
         return err
-    select_profile(self, display_id)
+    # Attempt profile selection even when the stock login reported an error.
+    # If Dropout redirects the login POST to /profile/pick, the picker page
+    # lacks the ``user_has_subscription`` marker the stock check looks for, so
+    # the login is misreported as failed despite the session being valid.
+    # Without a valid session /profile/pick does not render the picker, so a
+    # genuine credential failure still returns the original error.
+    if select_profile(self, display_id):
+        return None
     return err
 
 
