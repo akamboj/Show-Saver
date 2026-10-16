@@ -59,8 +59,9 @@ version and the changelog are computed from them:
 | `chore:`, `docs:`, `build:`, …       | no release on their own |
 
 Dependencies are pinned in [`requirements.txt`](requirements.txt) /
-[`requirements-dev.txt`](requirements-dev.txt), and Dependabot proposes weekly
-updates: yt-dlp in its own PR, the other Python packages grouped into one.
+[`requirements-dev.txt`](requirements-dev.txt), and Dependabot checks them daily:
+yt-dlp gets its own PR as soon as a release is out, the other Python packages
+are grouped into one PR and wait a 3-day cooldown before a new version is proposed.
 Production pip PRs and docker (base image) PRs are titled `fix(deps): …`
 because they change the shipped image, so merging one queues a PATCH release
 PR automatically. Dev-only bumps (`requirements-dev.txt`: pytest, debugpy —
@@ -68,7 +69,7 @@ never installed in the published image) and `github-actions` PRs are titled
 `build(deps): …` and trigger no release.
 
 For an urgent update (e.g. a [yt-dlp](https://github.com/yt-dlp/yt-dlp) fix
-for a Dropout breakage), don't wait for the weekly cycle: GitHub → Insights →
+for a Dropout breakage), don't wait for the daily check: GitHub → Insights →
 Dependency graph → **Dependabot** tab → click the **Recent update jobs** /
 "last checked N ago" link next to `requirements.txt`, then **Check for
 updates**. Dependabot re-scans and opens the bump PR immediately.
