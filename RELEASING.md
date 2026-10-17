@@ -60,7 +60,7 @@ version and the changelog are computed from them:
 
 Dependencies are pinned in [`requirements.txt`](requirements.txt) /
 [`requirements-dev.txt`](requirements-dev.txt), and Dependabot checks them daily:
-yt-dlp gets its own PR as soon as a release is out, the other Python packages
+yt-dlp gets its own PR as soon as a new build is out, the other Python packages
 are grouped into one PR and wait a 3-day cooldown before a new version is proposed.
 Production pip PRs and docker (base image) PRs are titled `fix(deps): …`
 because they change the shipped image, so merging one queues a PATCH release
