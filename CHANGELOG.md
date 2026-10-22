@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.6.3](https://github.com/akamboj/Show-Saver/compare/v0.6.2...v0.6.3) (2026-10-22)
+
+
+### Bug Fixes
+
+* **deps:** bump yt-dlp from 2026.8.19 to 2026.10.21 ([#84](https://github.com/akamboj/Show-Saver/issues/84)) ([87c3e40](https://github.com/akamboj/Show-Saver/commit/87c3e40102e4658ca40dec1a83eca6fa267afa8e))
+
 ## [0.6.2](https://github.com/akamboj/Show-Saver/compare/v0.6.1...v0.6.2) (2026-10-15)
 
 
