@@ -45,11 +45,6 @@ downloader.py
 ├── copy_to_destination()  → organizes to SHOW_DIR/{ShowName}/Season {N}/
 └── process_url()          → master orchestration (metadata → download → organize → Sonarr)
 
-dropout_profile.py
-└── Temporary workaround: patches yt-dlp's DropoutIE._login to select an account profile
-    after login (Dropout's "who's watching" picker, yt-dlp issue #17823). Imported for its
-    side effect by downloader.py; remove once upstream yt-dlp handles the picker.
-
 sonarr.py
 ├── Sonarr API client: rescan, rename, wait for command completion
 └── is_episode_in_library()  → episode presence lookup (hasFile) behind a 60 s TTL cache
