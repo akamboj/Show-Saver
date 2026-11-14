@@ -1,7 +1,8 @@
 version: 2
 updates:
-  # Shipped deps (pip, docker) use fix(deps): so release-please cuts a PATCH;
-  # dev-only and github-actions bumps use build(deps): and don't release.
+  # Shipped deps (pip, docker) use the deps: type so release-please cuts a PATCH
+  # and lists them under "Maintenance"; dev-only and
+  # github-actions bumps use build(deps-dev): / build(deps): and don't release.
   # One pip block (Dependabot allows one per ecosystem+directory): yt-dlp gets
   # its own PR with no cooldown; everything else is grouped behind 3 days.
   - package-ecosystem: pip
@@ -9,9 +10,8 @@ updates:
     schedule:
       interval: daily
     commit-message:
-      prefix: "fix"
-      prefix-development: "build"
-      include: "scope"
+      prefix: "deps"
+      prefix-development: "build(deps-dev)"
     cooldown:
       default-days: 3
       exclude:
@@ -34,5 +34,4 @@ updates:
     schedule:
       interval: weekly
     commit-message:
-      prefix: "fix"
-      include: "scope"
+      prefix: "deps"

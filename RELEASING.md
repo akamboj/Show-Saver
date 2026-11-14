@@ -53,7 +53,8 @@ version and the changelog are computed from them:
 
 | Commit prefix                        | Effect on next version |
 |--------------------------------------|------------------------|
-| `fix:` (incl. `fix(deps):`)          | PATCH bump             |
+| `fix:`                               | PATCH bump             |
+| `deps:` (dependency updates)         | PATCH bump, listed under **Maintenance** |
 | `feat:`                              | MINOR bump             |
 | `feat!:` / `BREAKING CHANGE:` footer | MAJOR bump             |
 | `chore:`, `docs:`, `build:`, …       | no release on their own |
@@ -62,11 +63,12 @@ Dependencies are pinned in [`requirements.txt`](requirements.txt) /
 [`requirements-dev.txt`](requirements-dev.txt), and Dependabot checks them daily:
 yt-dlp gets its own PR as soon as a release is out, the other Python packages
 are grouped into one PR and wait a 3-day cooldown before a new version is proposed.
-Production pip PRs and docker (base image) PRs are titled `fix(deps): …`
+Production pip PRs and docker (base image) PRs are titled `deps: …`
 because they change the shipped image, so merging one queues a PATCH release
-PR automatically. Dev-only bumps (`requirements-dev.txt`: pytest, debugpy —
+PR automatically; they appear in the changelog under **Maintenance** rather
+than **Bug Fixes**. Dev-only bumps (`requirements-dev.txt`: pytest, debugpy —
 never installed in the published image) and `github-actions` PRs are titled
-`build(deps): …` and trigger no release.
+`build(deps-dev): …` / `build(deps): …` and trigger no release.
 
 For an urgent update (e.g. a [yt-dlp](https://github.com/yt-dlp/yt-dlp) fix
 for a Dropout breakage), don't wait for the daily check: GitHub → Insights →
@@ -164,4 +166,4 @@ GitHub Release is marked as a pre-release and DockerHub gets `:0.4.0-rc.1` only
 - [`.github/workflows/cut-release.yml`](.github/workflows/cut-release.yml)
   — the manual **Cut Release** button described above.
 - [`.github/dependabot.yml`](.github/dependabot.yml) — dependency update
-  schedule, grouping, and the `fix(deps)` commit prefix for pip/docker.
+  schedule, grouping, and the `deps` commit prefix for pip/docker.
