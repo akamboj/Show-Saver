@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.6.4](https://github.com/akamboj/Show-Saver/compare/v0.6.3...v0.6.4) (2026-11-18)
+
+
+### Bug Fixes
+
+* **deps:** bump docker/login-action from 4.7.0 to 4.8.0 ([#94](https://github.com/akamboj/Show-Saver/issues/94)) ([4f7edaf](https://github.com/akamboj/Show-Saver/commit/4f7edaf90c4c314842f1eb6b2da3e117cb84ed66))
+* **deps:** bump github/codeql-action from 4.39.2 to 4.39.3 ([#95](https://github.com/akamboj/Show-Saver/issues/95)) ([615e254](https://github.com/akamboj/Show-Saver/commit/615e25446fa6794ae4d163d92f5ff86e94c6fc02))
+
+
+### Maintenance
+
+* bump gunicorn from 26.2.0 to 27.0.0 in the python-deps group across 1 directory ([#96](https://github.com/akamboj/Show-Saver/issues/96)) ([798cb56](https://github.com/akamboj/Show-Saver/commit/798cb56c2f38d1e301cf07a0388e060e0204be52))
+* bump python from 3.14-slim to 3.15-slim ([#93](https://github.com/akamboj/Show-Saver/issues/93)) ([40bb75f](https://github.com/akamboj/Show-Saver/commit/40bb75f8e8a2ea650fe110a18f7dcec7af083e1a))
+
 ## [0.6.3](https://github.com/akamboj/Show-Saver/compare/v0.6.2...v0.6.3) (2026-11-12)
 
 
