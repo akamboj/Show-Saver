@@ -4,4 +4,4 @@ flask-smorest==0.47.0
 gunicorn==27.0.1
 marshmallow==4.4.0
 requests==2.34.2
-yt-dlp==2026.10.26
+yt-dlp==2026.11.23
